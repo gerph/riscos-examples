@@ -1,0 +1,14 @@
+REM> CursorShape
+REM Demonstrate changes of the VDU cursor; press a key between each.
+REM
+:
+PRINT"Cursor off: ";
+VDU23;8202;0;0;0;       :G=GET:PRINT
+PRINT"Cursor block (no flash): ";
+VDU23,0,10,0+32*0;0;0;0 :G=GET:PRINT
+PRINT"Cursor underline (no flash): ";
+VDU23,0,10,6+32*0;0;0;0 :G=GET:PRINT
+PRINT"Cursor block (flash): ";
+VDU23,0,10,0+32*2;0;0;0 :G=GET:PRINT
+PRINT"Cursor underline (flash): ";
+VDU23,0,10,6+32*2;0;0;0 :G=GET:PRINT

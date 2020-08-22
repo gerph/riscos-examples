@@ -1,0 +1,19 @@
+REM List dynamic areas
+
+PRINT "  #  Name                      Base      Size     Maximum"
+num=-1
+REPEAT
+ REM Enumerate the dynamic areas, getting the next number
+ SYS "OS_DynamicArea",3,num TO ,num
+ IF num<>-1 THEN
+  REM Not at the end of the list, so get the DA details
+  SYS "OS_DynamicArea",2,num TO ,,size,base,flags,max,handler,ws,name$
+  REM And print them out
+  a$=RIGHT$("   "+STR$num,3)+". "
+  a$+=name$+STRING$(25-LEN(name$)," ")+" "
+  a$+=RIGHT$("00000000"+STR$~base,8)+"  "
+  a$+=RIGHT$("00000000"+STR$~size,8)+"/"
+  a$+=RIGHT$("00000000"+STR$~max,8)+"  "
+  PRINTa$
+ ENDIF
+UNTILnum=-1

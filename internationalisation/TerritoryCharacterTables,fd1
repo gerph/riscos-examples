@@ -1,0 +1,61 @@
+REM >CharTable
+REM List the character property tables from the Territory manager.
+:
+REM An identity table that we'll use as a skeleton to show the identity table.
+DIM b% 256
+FORI=0TO255
+ b%?I=I
+NNEXT
+
+REM Regular
+PRINT"Regular characters:"
+PROCprinttable(b%, FALSE)
+
+REM Upper case
+SYS "Territory_UpperCaseTable",-1 TO table%
+PRINT"Upper case characters:"
+PROCprinttable(table%, FALSE)
+
+REM Lower case
+SYS "Territory_LowerCaseTable",-1 TO table%
+PRINT"Lower case characters:"
+PROCprinttable(table%, FALSE)
+
+REM Plain characters
+SYS "Territory_PlainTable",-1 TO table%
+PRINT"Plain characters:"
+PROCprinttable(table%, FALSE)
+
+REM Control characters
+SYS "Territory_ControlTable",-1 TO table%
+PRINT"Codes used when ctrl held with a character:"
+PROCprinttable(table%, FALSE)
+
+REM Value table
+SYS "Territory_ValueTable",-1 TO table%
+PRINT"Value table for hexatridecimal:"
+PROCprinttable(table%, TRUE)
+END
+
+DEF PROCprinttable(table%, as_value)
+PRINT "    ";
+FOR I = 0 TO 15
+  PRINT " ";RIGHT$("0" + STR$~I, 3);
+NEXT
+PRINT
+FOR I = 0 TO 255
+  IF (I AND 15) = 0 THENPRINT RIGHT$("   "+STR$~I, 3);" ";
+  v = table%?I
+  IF as_value THEN
+    v$ = RIGHT$(" " + STR$v, 2)
+  ELSE
+    IF v > 31 AND v <> 127 THENv$=" "+CHR$(v)
+    IF v < 32 THENv$="^"+CHR$(v+64)
+    IF v = 127 THENV$="^?"
+  ENDIF
+  PRINT" ";v$;
+  IF (I AND 15) = 15 THENPRINT
+NEXT
+PRINT
+PRINT
+ENDPROC

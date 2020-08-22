@@ -1,0 +1,33 @@
+REM >FindInkey
+REM Test for INKEY values
+PRINT"Press keys to see the INKEY values"
+:
+REM INKEY is equivalent to OS_Byte &81, 255, inkey
+:
+REPEAT
+ FOR key=-1TO-128 STEP -1
+  IF INKEY(key) THENPRINT"INKEY(";key;") pressed"
+ NEXT
+UNTIL0
+:
+REM -1  = Shift (either)
+REM -2  = Ctrl (either)
+REM -3  = Alt (either)
+REM -4  = Left Shift
+REM -5  = Left Ctrl
+REM -6  = Left Alt
+REM -7  = Right Shift
+REM -8  = Right Ctrl
+REM -9  = Right Alt
+REM -62 = Insert
+REM -63 = Home
+REM -64 = Page Up
+REM -90 = Delete
+REM -106= Copy
+REM -79 = Page Down
+REM -58 = Cursor up
+REM -26 = Cursor left
+REM -42 = Cursor down
+REM -122= Cursor right
+REM -33 = Print
+

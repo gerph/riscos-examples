@@ -1,0 +1,17 @@
+REM> Hourglass
+:
+REM Turn on the hourglass
+SYS "Hourglass_On"
+PRINT "Press a key to test the percentage":G=GET
+FOR percent=0TO 99 STEP .1
+ SYS "Hourglass_Percentage",percent
+NEXT
+PRINT"Press a key to cycle LEDs":G=GET
+PRINT"Press a key to move to the next LED"
+FOR led=0TO15
+ SYS "Hourglass_LEDs",led
+ G=GET
+NEXT
+SYS "Hourglass_Off"
+
+END

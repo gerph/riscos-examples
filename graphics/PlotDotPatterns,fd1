@@ -1,0 +1,22 @@
+REM >PlotDotPatterns
+REM Demonstrate how the dotted patterns work, and their effect on the PLOT commands
+REM PLOT 16 is the code for 'draw line with both end points, dotted'
+REM +5 means 'plot absolute in the foreground colour'
+
+REM Change to a mode where the size of the pixels makes the dot parren really clear
+MODE 2
+
+REM Using the default dotted pattern
+MOVE 32,32
+PLOT 16+5, 320, 32
+
+REM Define a two pixel pattern
+VDU23, 6, %00110011, %00110011, %00110011, %00110011, %00110011, %00110011, %00110011, %00110011
+MOVE 32,40
+PLOT 16+5, 320, 40
+
+REM Define a four-on, two-off pattern
+VDU23, 6, %11001111, %11110011, %00111100, 0, 0, 0, 0, 0
+SYS "OS_Byte", 163, 242, 8*3
+MOVE 32,48
+PLOT 16+5, 320, 48

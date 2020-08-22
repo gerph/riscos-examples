@@ -1,0 +1,100 @@
+REM >PoduleEnumeration
+REM Enumerate the podules and the chunks within them.
+:
+ON ERROR ERROR EXT ERR, REPORT$ + " at line " + STR$ERL
+DIM buffer% 256
+
+SYS "Podule_ReturnNumber" TO expcards, extroms
+PRINT "Expansion cards: ";expcards
+PRINT "Extension ROMS:  ";extroms
+
+IF extroms > 0 THEN
+ FOR romsection = -2 TO -1 - extroms STEP -1
+  PROCshow_romsection(romsection)
+ NEXT
+ENDIF
+
+IF expcards > 0 THEN
+ FOR romsection = 0 TO expcards - 1
+  PROCshow_romsection(romsection)
+ NEXT
+ENDIF
+END
+:
+DEFFNstring0(x)
+LOCAL x$
+SYS "OS_IntOn",x TO x$
+=x$
+:
+DEFFNhex(v, width)
+="&" + RIGHT$(STRING$(width, "0") + STR$~v, width)
+:
+DEFPROCshow_romsection(romsection)
+PRINT"ROM section "; romsection
+
+SYS "XPodule_ReadID",,,,romsection TO ecid ;flags
+IF flags AND 1 THEN
+ PRINT "  Not a podule (";FNstring0(ecid+4);")"
+ ENDPROC
+ENDIF
+
+IF ecid AND (1<<1) THEN
+ PRINT "  Not a podule (ECid says not present)"
+ ENDPROC
+ENDIF
+PRINT"  ECId: &";STR$~ecid
+
+REM Try listing the chunks
+chunk = 0
+REPEAT
+  SYS "Podule_EnumerateChunksWithInfo",chunk,,,romsection TO nextchunk, size, osid,, modname, modhelp, modbase
+  IF nextchunk <> 0 THEN
+    name$="unknown"
+    os = (osid AND &F0) >> 4
+    type = osid AND &F
+    has_string = FALSE
+    CASE os OF
+     WHEN &8:
+      name$ = "RISCOS: "
+      CASE type OF
+       WHEN 0: name$+="Loader"
+       WHEN 1: name$+="Module"
+       WHEN 2: name$+="BBC ROM"
+       WHEN 3: name$+="Sprite"
+       OTHERWISE: name$+="type "+STR$type
+      ENDCASE
+     WHEN &F:
+      name$ = "Device data: "
+      CASE type OF
+       WHEN 0: name$+="Chunk directory"
+       WHEN 1: name$+="Serial number":has_string = TRUE
+       WHEN 2: name$+="Date of manufacture":has_string = TRUE
+       WHEN 3: name$+="Modification status":has_string = TRUE
+       WHEN 4: name$+="Place of manufacture":has_string = TRUE
+       WHEN 5: name$+="Description":has_string = TRUE
+       WHEN 6: name$+="Part number":has_string = TRUE
+       WHEN 7: name$+="Ethernet MAC"
+       WHEN 8: name$+="PCB revision"
+       OTHERWISE: name$+="type "+STR$type
+      ENDCASE
+     OTHERWISE
+      name$="OS "+STR$~os+": type "+STR$type
+    ENDCASE
+    PRINT"  Chunk ";chunk;"  Size: ";FNhex(size, 6); "  OSId: ";FNhex(osid, 2);"  ";name$
+    IF has_string THEN
+     IF size > 256 THEN
+      PRINT"    <chunk too large to show>"
+     ELSE
+      SYS "XPodule_ReadChunk",chunk,,buffer%,romsection TO r0;flags
+      IF flags AND 1 THEN
+       PRINT"    <error: ";FNstring0(r0+4);">"
+      ELSE
+       buffer%?size = 0
+       PRINT"    """;FNstring0(buffer%);""""
+      ENDIF
+     ENDIF
+    ENDIF
+  ENDIF
+  chunk=nextchunk
+UNTIL chunk = 0
+ENDPROC

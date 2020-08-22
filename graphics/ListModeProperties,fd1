@@ -1,0 +1,51 @@
+REM >ModeTest
+REM By Justin Fletcher
+:
+REM List the Mode variables for numbered modes.
+:
+REM Listed values:
+REM   x/y eigenfactors
+REM   x/y resolution
+REM   number of colours
+REM   bytes per character
+REM   log2 bits per pixels
+REM   mode flags
+:
+PRINT"Mode","   xe","   ye","   x","   y","   cols","   bpc","   bpp","   flags"
+FORI=0TO127
+IF FNmodevalid(I) THEN
+ xe=FNreadmodevar(I,4)
+ ye=FNreadmodevar(I,5)
+ REM Graphics resolution - the variable value is the highest valid coordinate
+ mx=FNreadmodevar(I,11)+1
+ my=FNreadmodevar(I,12)+1
+ REM Text resolution - the variable value is the highest valid coordinate
+ tx=FNreadmodevar(I,1)+1
+ ty=FNreadmodevar(I,2)+1
+ REM Highest colour number
+ cl=FNreadmodevar(I,3)+1
+ REM Bytes per characters minus one; byte per character is not generally a useful variable to most users
+ bpc=FNreadmodevar(I,10)+1
+ REM Log2 bits per pixel
+ bpp=FNreadmodevar(I,9)+1
+ REM Amount of memory
+ k=FNreadmodevar(I,7)/1024
+ flags=FNreadmodevar(I,0)
+ REM 64 colours => old style 256 colour mode
+ IF cl=64 THENcl=256
+ PRINT"Mode: ";I,xe,ye,mx,my,cl,bpc,bpp,flags
+ENDIF
+NEXT
+END
+:
+DEF FNmodevalid(M%)
+LOCAL V%
+M%=M% AND &FF
+IF M%=MODE THEN =TRUE
+SYS "XOS_CheckModeValid",M% TO V%
+=(V%<>-1)
+:
+DEF FNreadmodevar(M%,N%)
+LOCAL R%
+SYS "XOS_ReadModeVariable",M%,N% TO ,,R%
+=R%

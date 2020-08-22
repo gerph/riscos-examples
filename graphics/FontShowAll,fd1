@@ -1,0 +1,123 @@
+REM>FontShow
+REM Show all the fonts that are known to the system, in pages.
+REM We try to keep families together, and pack the styles across the page.
+REM Press a key between pages to show more fonts.
+:
+ON ERROR ERROR EXT ERR, REPORT$ + " at line " + STR$ERL
+:
+REM ---- First we work out how big the screen is so that we can page nicely
+SYS "OS_ReadModeVariable", -1, 4 TO ,,xeig%
+SYS "OS_ReadModeVariable", -1, 5 TO ,,yeig%
+SYS "OS_ReadModeVariable", -1, 11 TO ,,scrwidth%
+SYS "OS_ReadModeVariable", -1, 12 TO ,,scrheight%
+scrwidth% = scrwidth% << xeig%
+scrheight% = scrheight% << yeig%
+:
+REM ---- Set some parameters for the fonts we'll use
+encoding$="Latin1"
+fontsize%=12
+fgcol%=&ffffff00
+:
+REM ---- Set some parameters for how we'll place the fonts
+ytop% = 48
+xleft% = 32
+widthmult% = 320
+rowheight% = 32
+xgap% = 16
+ygap% = 16
+ygapfamily% = 32
+:
+REM ---- Initial parameters and set the screen up
+REM We leave the mode the same as you're already in.
+x% = xleft%
+y% = scrheight% - ytop%
+:
+VDU26:CLS
+:
+REM --- Enumeration of the fonts, and we call PROCgotfont to process it
+lastfamily$=""
+DIM name% 256, localname% 256
+flags%=(1<<16) OR (1<<17)
+$name%="":$localname%=""
+REPEAT
+ SYS "Font_ListFonts",,name%,flags%,256,localname%,256 TO ,name$,flags%,,local$
+ IF flags% <> -1 THEN
+  REMPRINT"Font: ";name$;" - " ;local$
+  PROCgotfont(name$)
+ ENDIF
+UNTILflags% = -1
+END
+:
+REM ---- Each font we find, we determine whether it's part of the same family
+REM and move on to the next if it's not.
+DEF PROCgotfont(name$)
+family$=LEFT$(name$, INSTR(name$+".", ".")-1)
+REMPRINTfamily$
+IF lastfamily$ <> family$ THEN
+  IF lastfamily$ <> "" THENPROCendfamily
+  lastfamily$=family$
+  PROCstartfamily
+ENDIF
+PROCshowfont(name$)
+ENDPROC
+
+REM ---- We've filled a row, so move on - maybe go to the next page
+DEF PROCnextrow
+x% = xleft%
+y% -= ygap% + rowheight%
+PROCcheckpage
+ENDPROC
+
+REM ---- Each family starts on the start of a new line
+DEF PROCstartfamily
+x% = xleft%
+ENDPROC
+
+REM ---- The end of a family means we move down - and then check if we need to go
+REM to a new page
+DEF PROCendfamily
+y% -= ygapfamily% + rowheight%
+PROCcheckpage
+ENDPROC
+:
+REM ---- If we're close to the bottom of the screen, ask the user to move on.
+REM Then reset the parameters to the top of the screen again
+DEFPROCcheckpage
+IF y% - ygapfamily% + rowheight% < 0 THEN
+ PRINT"Next page? ";
+ SYS "OS_Confirm" TO y%
+ IF y% <> ASC"y" THENEND
+ CLS
+ x% = xleft%
+ y% = scrheight% - ytop% - ygap%
+ENDIF
+ENDPROC
+:
+:
+REM --- Print a string in the font, using the specified encoding, in the right place
+REM on the screen.
+REM We use the StringBBox to get its size - that's good enough for these purposes.
+REM If you were being more dilligent about the spacing, you'd probably use Font_ScanString
+REM as it offers more options.
+DEF PROCshowfont(name$)
+LOCAL flags%
+SYS "XFont_FindFont",,name$+"\E"+encoding$,fontsize%*16,fontsize%*16,0,0 TOf% ;flags%
+IF flags% AND 1 THEN
+ REM Font wasn't found?
+ ENDPROC
+ENDIF
+SYS "Font_StringBBox",f%,name$ TO ,xmin,ymin,xmax,ymax
+width% = (xmax / 400)
+REMwidth% = 8*2 * LEN(name$)
+IF x% + width% >= scrwidth% THEN
+  PROCnextrow
+ENDIF
+:
+REMMOVE x%, y% - 8*2 : VDU5:PRINTname$:VDU4
+SYS "ColourTrans_SetFontColours",f%,&00000000, fgcol%,14
+SYS "Font_Paint",f%, name$, (1<<8)OR(1<<4), x%, y%
+:
+SYS "Font_LoseFont",f%
+width% = (((width%+xgap%) DIV widthmult%) + 1) * widthmult%
+x% += width%
+ENDPROC

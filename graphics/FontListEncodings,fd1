@@ -1,0 +1,17 @@
+REM>ListFontEncodings
+REM List the encodings with their real and local names.
+:
+DIM name% 256, localname% 256
+:
+REM Bit 16: return the encoding identifier in buffer in R1
+REM Bit 17: return the local encoding identifier in buffer in R4
+REM Bit 22: return the encodings
+:
+flags%=(1<<16) OR (1<<17) OR (1<<22)
+$name%="":$localname%=""
+REPEAT
+ SYS "Font_ListFonts",,name%,flags%,256,localname%,256 TO ,name$,flags%,,local$
+ IF flags% <> -1 THEN
+  PRINT"Encoding: ";name$;" - " ;local$
+ ENDIF
+UNTILflags% = -1

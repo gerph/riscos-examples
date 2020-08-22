@@ -1,0 +1,24 @@
+REM List the identifiers from the Territory module
+DIM b% 256
+:
+PRINT"Territory numbers -> names"
+REM Note: 0 is the current territory
+FORI=0TO255
+ SYS "XTerritory_NumberToName",I,b%,256 TO ,a$;flags
+ IF (flags AND 1)=0 THENPRINTI; " : ";a$
+NEXT
+:
+PRINT
+PRINT"Alphabet numbers -> names"
+REM Note: 0 is the current alphabet
+FORI=0TO255
+ SYS "XTerritory_AlphabetNumberToName",I,b%,256 TO ,a$;flags
+ IF (flags AND 1)=0 THENPRINTI; " : ";a$
+NEXT
+:
+PRINT
+PRINT"Alphabet identifiers"
+FORI=0TO255
+ SYS "XTerritory_AlphabetIdentifier",I TO a$;flags
+ IF (flags AND 1)=0 THENPRINTI; " : ";a$
+NEXT

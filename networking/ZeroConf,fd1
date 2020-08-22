@@ -1,0 +1,7 @@
+REM >ZeroConf
+
+REM Begin a ZeroConf configuration of an interface.
+SYS "ZeroConf_Control", 0, "epy0"
+
+REM Stop a ZeroConf configuration of an interface
+SYS "ZeroConf_Control", 1, "epy0"

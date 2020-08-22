@@ -1,0 +1,23 @@
+REM > FreewayEnumeration
+
+DIM buf% 256,buf2% 256
+
+Freeway_Hosts=5:REM Constant for the 'hosts'
+
+next%=0
+REPEAT
+ REM Freeway has a registration with a name (in the first buffer).
+ REM Each registration has associated data (in the second buffer)
+ REM IP addresses are only in IPv4 format; it is not possible to use Freeway with IPv4 in its
+ REM current form.
+ SYS "Freeway_Enumerate",%0,Freeway_Hosts,256,buf%,256,buf2%,0,next% TO,,,,,,ip%,next%
+ IF next%<>-1 THEN
+  PRINT"Got ";~ip%,FNstring0(buf%)
+ ENDIF
+UNTIL next%=-1
+END
+
+DEFFNstring0(a%)
+LOCAL a$
+SYS "OS_IntOn",a% TO a$
+=a$
