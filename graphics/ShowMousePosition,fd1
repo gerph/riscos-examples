@@ -1,0 +1,41 @@
+REM > ShowMousePosition
+REM
+REM Show the mouse position by plotting a square at its location.
+REM Clicking the mouse buttons change the colours - R, G, B depending on
+REM the mouse button clicked.
+REM
+REM Press a key to exit.
+REM
+
+MODE 28
+col_r% = 255
+col_g% = 255
+col_b% = 255
+step% = 64
+size% = 16
+REPEAT
+ GCOL 0, col_r%, col_g%, col_b%
+ MOUSE x%, y%, b%
+ VDU30:PRINT"Position: "; x%,y%,b%; " - colour: ";col_r%, col_g%,col_b%
+
+ REM Buttons change the colours
+ IF b% AND 4 THEN
+  REM Left button changes red
+  col_r% = col_r% + step%
+  IF col_r% > 255 THEN col_r% = step% - 1
+ ENDIF
+ IF b% AND 2 THEN
+  REM Middle button changes green
+  col_g% = col_g% + step%
+  IF col_g% > 255 THEN col_g% = step% - 1
+ ENDIF
+ IF b% AND 1 THEN
+  REM Right button changes blue
+  col_b% = col_b% + step%
+  IF col_b% > 255 THEN col_b% = step% - 1
+ ENDIF
+
+ REM Plot a rectangle, centred on the mouse position.
+ RECTANGLE FILL x% - size%/2, y% - size%/2, size%, size%
+
+UNTIL INKEY(1) <> -1
