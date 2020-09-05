@@ -1,0 +1,101 @@
+REM>PlotJPEG
+REM Plot a JPEG from memory (ie load it and then plot)
+REM
+REM We try to plot the sprite with the correct size on screen as was intended, using the
+REM DPI or pixel ratio given by the JPEG where possible, and correcting for the shape of
+REM the pixels in the current mode.
+REM
+
+ON ERROR ERROR EXT ERR, REPORT$ + " at line " + STR$ERL
+:
+MODE 15
+:
+REM File to draw- substitute your own here
+file$="gerph-small/jpg"
+:
+SYS "OS_File", 5, file$ TO ,,,,size%
+DIM jpeg% size%
+SYS "OS_File", 255, file$, jpeg%
+:
+DIM scale% 4*4
+:
+scale%!0 = 1:REM XMult
+scale%!4 = 1:REM YMult
+scale%!8 = 1:REM XDiv
+scale%!12 = 1:REM YDiv
+:
+REM Where to plot it
+x%=64:y%=64
+:
+REM bit 0: dither in 16bpp and lower
+REM bit 1: dither error diffused
+flags% = %11
+:
+SYS "OS_ReadModeVariable",-1, 4 TO ,,xeig%
+SYS "OS_ReadModeVariable",-1, 5 TO ,,yeig%
+PRINT"Screen:  xeig: ";xeig%;" yeig: ";yeig%
+:
+REM Request the image dimensions and DPI.
+SYS "JPEG_Info", %1, jpeg%, size% TO info_flags%,, image_width%, image_height%, xdpi%, ydpi%
+PRINT "Image size: ", image_width%, image_height%
+PRINT "Image DPI: ", xdpi%, ydpi%
+IF info_flags% AND %100 THEN
+ PRINT "  Image DPI is actually a ratio"
+ENDIF
+:
+REM Calculate the width and height of the image as it would appear in destination pixels on the screen.
+width% = image_width% << xeig%
+height% = image_height% << yeig%
+
+REM Account for the image dpi
+IF info_flags% AND %100 THEN
+ REM The DPI values are just a ratio for the relative pixel sizes
+ REM We change the scale factors to ensure the JPEG source image pixel sizes are correct
+ IF ydpi% > xdpi% THEN
+  scale%!0 = ydpi%
+  scale%!8 = xdpi%
+ ELSE
+  scale%!4 = xdpi%
+  scale%!12 = ydpi%
+ ENDIF
+ELSE
+ REM The DPI values really are DPI values, so we can apply them to the current screen DPI
+ scale%!0 = 180 >> xeig%
+ scale%!4 = 180 >> yeig%
+ scale%!8 = xdpi%
+ scale%!12 = ydpi%
+ENDIF
+:
+REM JPEG_PlotScaled plots the images 1-source-pixel to 1-destination-pixel, so if your mode doesn't have
+REM square pixels, the output won't be square. The width% and height% shifts by xeig% and yeig%, above
+REM worked out what would be drawn if we don't correct for this. Here, we correct for the shape of the
+REM pixels by increasing the scale factor so that the small dimension is pixel-doubled (or more) to match
+REM the size of the larger dimension.
+IF xeig% > yeig% THEN
+ REM pixels are wider than they are tall
+ factpr% = 1<<(xeig%-yeig%)
+ PRINT"Wide pixels: Increasing y-scaling factor by ";factor%
+ scale%!4 = (scale%!4) * factor%
+ENDIF
+IF yeig% > xeig% THEN
+ REM pixels are taller than they are wide (eg MODE 12)
+ factor% = 1<<(yeig%-xeig%)
+ PRINT"Tall pixels: Increasing x-scaling factor by ";factor%
+ scale%!0 = (scale%!0) * factor%
+ENDIF
+:
+PRINT "Will scale x: ";scale%!0;" / ";scale%!8
+PRINT "Will scale y: ";scale%!4;" / ";scale%!12
+width% = width% * scale%!0 / scale%!8
+height% = height% * scale%!4 / scale%!12
+
+REM Draw some markers - the rectangle where the JPEG will be, and the corners
+GCOL 0, 128, 0, 0:RECTANGLE x%,y%, width%,height%
+GCOL 0, 0, 128, 0:MOVE x%-16, y%:DRAW x%,y%:DRAW x%,y%-16
+GCOL 0, 0, 128, 0:MOVE x%+width%+16, y%+height%:DRAW x%+width%,y%+height%:DRAW x%+width%,y%+height%+16
+
+:
+SYS "JPEG_PlotScaled", jpeg%, x%, y%, scale%, size%, flags%
+
+REM Wait for a key press
+G=GET
