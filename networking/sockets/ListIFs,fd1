@@ -1,0 +1,257 @@
+REM >ListIFs
+REM Started 26 Apr 2002
+REM Updated 25 Oct 2004
+REM Updated 06 Sep 2020 for IPv6
+REM (c) Gerph
+REM
+ON ERROR REPORT:PRINT" at line ";ERL:END
+:
+REM This program will list the interfaces using the 'new'
+REM (Internet 5) SIOCGIFCONF ioctl call. It is intended that it
+REM be used for information purposes.
+:
+REM Address families
+AF_INET=2
+AF_LINK=18
+AF_INET6=28
+:
+REM Socket type
+SOCK_STREAM=1
+:
+REM Routing constants
+RT_UP=1
+RT_GATEWAY=2
+RT_HOST=4
+RT_REJECT=8
+RT_DYNAMIC=&10:REM Added automatically by the stack
+RT_MODIFIED=&20
+RT_STATIC=&800:REM Static route
+RT_c=&10000
+:
+REM Interface constants
+_IFF_UP=1
+_IFF_BROADCAST=2
+_IFF_DEBUG=4
+_IFF_LOOPBACK=8
+_IFF_POINTOPOINT=16
+_IFF_NOTRAILERS=32
+_IFF_RUNNING=64
+_IFF_NOARP=128
+_IFF_PROMISC=256
+_IFF_ALLMULTI=512
+_IFF_CANREFLET=1024
+_IFF_SRCSUPPLIED=4096
+_IFF_NOT_INDIR=8192
+_IFF_NEED_MASK=16384
+REM Size of structures
+sizeof_rttinfo=12
+sizeof_ifreq=16+16
+sizeof_ifconf=8
+sizeof_pcbheads=39
+:
+REM Lots of constants from TCPIPLibs:sys.h.socket
+REM Not all of which we use
+SIOCGETRT=FN_IOR("r",6,sizeof_rttinfo)
+SIOCGIFADDR=FN_IOWR("i",13,sizeof_ifreq)
+NEW_SIOCGIFADDR=FN_IOWR("i",99,sizeof_ifreq)
+SIOCGIFDSTADDR=FN_IOWR("i",15,sizeof_ifreq)
+SIOCGIFBRDADDR=FN_IOWR("i",18,sizeof_ifreq)
+SIOCGIFNETMASK=FN_IOWR("i",21,sizeof_ifreq)
+SIOCGIFFLAGS=FN_IOWR("i",17,sizeof_ifreq)
+SIOCGIFCONF=FN_IOWR("i",20,sizeof_ifconf)
+NEW_SIOCGIFCONF=FN_IOWR("i",96,sizeof_ifconf)
+SIOCGPCBHEADS=FN_IOR("i",39,sizeof_pcbheads)
+:
+REM Memory for things
+DIM b% 1024,c% 1024
+:
+PROClistifs
+END
+:
+DEFFNhex2(a%):a%=a% AND 255:=STR$~(a% DIV16)+STR$~(a% MOD16)
+:
+DEFFN_IO(char$,num,size)
+=&20000000+(ASC(char$)<<8)+num
+DEFFN_IOR(char$,num,size)
+=&40000000+(size<<16)+(ASC(char$)<<8)+num
+DEFFN_IOW(char$,num,size)
+=&80000000+(size<<16)+(ASC(char$)<<8)+num
+DEFFN_IOWR(char$,num,size)
+=&C0000000+(size<<16)+(ASC(char$)<<8)+num
+:
+DEFPROClistifs
+LOCAL p%,I,ents,socket,name$,type$,x%,f%
+REM Open a socket so that we can do ioctl
+SYS "Socket_Creat",AF_INET,SOCK_STREAM,0 TO socket_ipv4
+:
+REM Note: We don't actually use the IPv6 socket for details right now; but this is how you might
+REM handle the case of the family not being supported.
+SYS "XSocket_Creat",AF_INET6,SOCK_STREAM,0 TO socket_ipv6;flags
+IF flags AND 1 THENsocket_ipv6 = -1
+:
+REM Clear out our buffer
+FORI=20TO1024-4 STEP4:b%!I=&FDFDFDFD:NEXT
+:
+REM Initialise the size of our buffer and pointer
+!c%=1024:REM Size of buffer
+c%!4=b%+20:REM Pointer to buffer
+:
+REM Read the interface configuration
+SYS "Socket_Ioctl",socket,NEW_SIOCGIFCONF,c%
+:
+REM Finished with the socket so close it now
+:
+p%=c%!4:REM Pointer to buffer data
+end%=!c%+p%:REM End of buffer data
+left%=!c%
+:
+REM PRINT"Space used in buffer = ";left%
+:
+REM Now we loop over the buffer, extracting the entries
+WHILE left%>=sizeof_ifreq
+ name$=FNstring0(p%)
+ type%=((p%!16)>>8) AND 255
+ REM The family is part of the structure. It used to be a short. It is now
+ REM a char, and the first char is the structure length. If the family is 0
+ REM (as would be the case if we'd used SIOCGIFCONF rather than
+ REM NEW_SIOCGIFCONF) this will still work.
+ len%=(p%!16 AND 255)+16
+ IF type%=0 THEN
+  REM Old style call was used - limited data may be returned
+  type%=(p%!16) AND &FFFF
+  len%=sizeof_ifreq
+ ENDIF
+ PRINT
+ PRINT"Interface ";name$
+ PRINT" length : ";len%
+ PRINT"   type : ";type%;" (";
+ CASE type% OF
+  WHEN 2:PRINT"AF_INET";
+  WHEN 28:PRINT"AF_INET6";
+  WHEN 18:PRINT"AF_LINK";
+  OTHERWISE:PRINT"Unknown";
+ ENDCASE
+ PRINT")"
+ PRINT"  extra : ";~(p%!16)>>16
+ :
+ CASE type% OF
+  WHEN AF_INET:REM Inet address assigned
+   REM Normal internet interface
+   ip$=STR$(p%?20)+"."+STR$(p%?21)+"."+STR$(p%?22)+"."+STR$(p%?23)
+   PRINT"     IP : ";ip$
+
+   x%=p%+20:REM The data pointer
+   :
+   REM Read the interface address
+   SYS "Socket_Ioctl",socket,SIOCGIFADDR,p%
+   ip$=STR$(x%?0)+"."+STR$(x%?1)+"."+STR$(x%?2)+"."+STR$(x%?3)
+   :
+   REM Read the destination address
+   SYS "XSocket_Ioctl",socket,SIOCGIFDSTADDR,p% TO;f%
+   IF (f% AND 1) THENdest$="" ELSEdest$=STR$(x%?0)+"."+STR$(x%?1)+"."+STR$(x%?2)+"."+STR$(x%?3)
+   :
+   REM Read the broadcast address
+   SYS "XSocket_Ioctl",socket,SIOCGIFBRDADDR,p% TO;f%
+   IF (f% AND 1) THENbrd$="" ELSEbrd$=STR$(x%?0)+"."+STR$(x%?1)+"."+STR$(x%?2)+"."+STR$(x%?3)
+   :
+   REM Read the netmask
+   SYS "XSocket_Ioctl",socket,SIOCGIFNETMASK,p% TO;f%
+   IF (f% AND 1) THENmask$="" ELSEmask$=STR$(x%?0)+"."+STR$(x%?1)+"."+STR$(x%?2)+"."+STR$(x%?3)
+   :
+   REM Finally read the flags for the interface
+   SYS "Socket_Ioctl",socket,SIOCGIFFLAGS,p%
+   PRINT"  flags : ";~p%!16
+   :
+   PRINT"     ip : ";ip$
+   PRINT"  dests : ";dest$
+   PRINT"    brd : ";brd$
+   PRINT"   mask : ";mask$
+
+  WHEN AF_LINK:REM Link Level address
+   REM See TCPIPLibs:net.h.if_dl for details
+   REM      struct sockaddr_dl {
+   REM          u_char  sdl_len;    /* Total length of sockaddr */
+   REM          u_char  sdl_family; /* AF_DLI */
+   REM          u_short sdl_index;  /* if != 0, system given index for interface */
+   REM          u_char  sdl_type;   /* interface type */
+   REM          u_char  sdl_nlen;   /* interface name length, no trailing 0 reqd. */
+   REM          u_char  sdl_alen;   /* link level address length */
+   REM          u_char  sdl_slen;   /* link layer selector length */
+   REM          char    sdl_data[12];   /* minimum work area, can be larger;
+   REM                         contains both if name and ll address */
+   REM      };
+
+   sockaddrp%=p%+16
+   PRINT"   type : ";x%?4;" (";
+   REM see TCPIPLibs:net.h.if_types
+   CASE sockaddrp%?4 OF
+    WHEN &6:PRINT"Ethernet";
+    WHEN &17:PRINT"PPP";
+    WHEN &18:PRINT"Loopback";
+    OTHERWISE:PRINT"Unknown";
+   ENDCASE
+   PRINT")"
+   n$="":lla$="":lls$=""
+   t%=sockaddrp%+8
+   :
+   REM The link level interface can be given a name by the stack
+   IF sockaddrp%?5<>0 THEN
+    FORI=1TOsockaddrp%?5:n$+=CHR$?t%:t%+=1:NEXT
+   ENDIF
+   :
+   REM The link level address, in the form of the 'sdltype'
+   IF sockaddrp%?6<>0 THEN
+    FORI=1TOsockaddrp%?6:lla$+=FNhex2(?t%)+":":t%+=1:NEXT
+   ENDIF
+   :
+   REM The link layer selector, in the form of the 'sdltype'
+   IF sockaddrp%?7<>0 THEN
+    FORI=1TOsockaddrp%?7:lls$+=FNhex2(?t%)+":":t%+=1:NEXT
+   ENDIF
+   PRINT"   name : ";n$
+   PRINT"LL-addr : ";LEFT$(lla$)
+   PRINT" LL-sel : ";LEFT$(lls$)
+
+  WHEN AF_INET6:REM IPv6 address
+   REM A sockaddr_in6 structure looks like this:
+   REM      struct sockaddr_in6 {
+   REM          u_char           sin6_len;      /* length of this structure */
+   REM          u_char           sin6_family;   /* AF_INET6                 */
+   REM          u_int16_t        sin6_port;     /* Transport layer port #   */
+   REM          u_int32_t        sin6_flowinfo; /* IPv6 flow information    */
+   REM          struct in6_addr  sin6_addr;     /* IPv6 address             */
+   REM          uint32_t         sin6_scope_id; /* scope zone index */
+   REM      };
+   sockaddrp% = p%+16
+   PRINT"flowinf : &";~sockaddrp%!4
+   ip$=""
+   FOR pair = 0 TO 7
+    high%=sockaddrp%?(8 + pair * 2)
+    low%=sockaddrp%?(8 + pair * 2 + 1)
+    halfword% = high% * 256 + low%
+    IF ip$ <> "" THEN ip$+=":"
+    REM For compactness, one run of 0s in the address can be elided in IPv6 addresses. We don't do that here.
+    ip$+=STR$~halfword%
+   NEXT
+   PRINT"     IP : ";ip$
+   PRINT"  scope : &";~sockaddrp%!(8+16)
+
+   REM Note: The similar pattern of address reading used in the AF_INET case, but isn't here.
+
+  OTHERWISE:REM All other types
+   x%=p%+20
+   FORI=0TO len%-20 STEP 4
+    PRINT"   ";RIGHT$("     "+STR$~I,6);" : ";RIGHT$("0000000"+STR$~(x%!I),8)
+   NEXT
+ ENDCASE
+ p%+=len%
+ left%-=len%
+ENDWHILE
+PRINT
+PRINT"Left at end ";left%
+ENDPROC
+:
+REM FNstring0 : Return 0-terminated string at location
+DEFFNstring0(a%):LOCAL a$:IF a%=0 THEN=""
+WHILE?a%>31 ANDLEN(a$)<255:a$=a$+CHR$?a%:a%=a%+1:ENDWHILE
+=a$
