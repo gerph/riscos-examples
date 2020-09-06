@@ -73,7 +73,7 @@ REM pixels by increasing the scale factor so that the small dimension is pixel-d
 REM the size of the larger dimension.
 IF xeig% > yeig% THEN
  REM pixels are wider than they are tall
- factpr% = 1<<(xeig%-yeig%)
+ factor% = 1<<(xeig%-yeig%)
  PRINT"Wide pixels: Increasing y-scaling factor by ";factor%
  scale%!4 = (scale%!4) * factor%
 ENDIF

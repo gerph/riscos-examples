@@ -1,0 +1,100 @@
+REM>PlotJPEG
+REM Plot a JPEG from memory (ie load it and then plot)
+REM
+REM We try to plot the sprite with the correct size on screen as was intended.
+REM
+
+ON ERROR ERROR EXT ERR, REPORT$ + " at line " + STR$ERL
+:
+MODE 15
+:
+REM File to draw- substitute your own here
+file$="gerph-small-sq/jpg"
+:
+SYS "OS_File", 5, file$ TO ,,,,size%
+DIM jpeg% size%
+SYS "OS_File", 255, file$, jpeg%
+:
+DIM transform% 4*6
+:
+transform%!0 = 1:REM xx (in 16.16 fixed point)
+transform%!4 = 0:REM xy (in 16.16 fixed point)
+transform%!8 = 0:REM yx (in 16.16 fixed point)
+transform%!12 = 1:REM yy (in 16.16 fixed point)
+transform%!16 = 0:REM x-offset (in draw units)
+transform%!20 = 0:REM y-offset (in draw units)
+:
+REM Where to plot it
+x%=64:y%=64
+:
+REM Notice these bits differ from those in the JPEG_PlotScaled calls
+REM bit 0: use coordinate block
+REM bit 1: dither in 16bpp and lower
+REM bit 2: dither error diffused
+flags% = %110
+:
+SYS "OS_ReadModeVariable",-1, 4 TO ,,xeig%
+SYS "OS_ReadModeVariable",-1, 5 TO ,,yeig%
+PRINT"Screen:  xeig: ";xeig%;" yeig: ";yeig%
+:
+REM Request the image dimensions and DPI.
+SYS "JPEG_Info", %1, jpeg%, size% TO info_flags%,, image_width%, image_height%, xdpi%, ydpi%
+PRINT "Image size: ", image_width%, image_height%
+PRINT "Image DPI: ", xdpi%, ydpi%
+IF info_flags% AND %100 THEN
+ PRINT "  Image DPI is actually a ratio"
+ENDIF
+:
+REM The image size on the screen is used by PlotTransformed is in OS units corrected for the DPI of the
+REM image, not screen pixels uncorrected, as PlotScaled uses, so there's no need to account for the
+REM eigenfactors in the transformation matrix.
+width% = image_width%
+height% = image_height%
+
+REM How we want the JPEG to be scaled
+xscale = 1
+yscale = 1
+
+REM Account for the image dpi
+IF info_flags% AND %100 THEN
+ REM The DPI values are just a ratio for the relative pixel sizes
+ REM We change the scale factors to ensure the JPEG source image pixel sizes are correct
+ REM In ratio mode, the images are assumed to be 90DPI for the smallest dimension
+ IF ydpi% > xdpi% THEN
+  width% = width% * 180 / 90
+  height% = height% * 180 / 90 * (ydpi% / xdpi%)
+ ELSE
+  width% = width% * 180 / 90 * (xdpi% / ydpi%)
+  height% = height% * 180 / 90
+ ENDIF
+ELSE
+ REM The DPI values really are DPI values, so we can apply them to the size of the image plotted
+ width% = width% * 180 / xdpi%
+ height% = height% * 180 / ydpi%
+ENDIF
+:
+REM JPEG_PlotTransformed plots using OS units, not screen pixels (as PlotScaled does), and so there is no
+REM need to account for the eigenfactors in the mode.
+width% = width% * xscale
+height% = height% * yscale
+:
+PRINT "Will scale x: ";xscale
+PRINT "Will scale y: ";yscale
+transform%!0 = xscale * &10000
+transform%!12 = yscale * &10000
+
+REM Apply the offset to the transformation matrix (in Draw coordinates)
+transform%!16 = x% * 256
+transform%!20 = y% * 256
+
+
+REM Draw some markers - the rectangle where the JPEG will be, and the corners
+GCOL 0, 128, 0, 0:RECTANGLE x%,y%, width%,height%
+GCOL 0, 0, 128, 0:MOVE x%-16, y%:DRAW x%,y%:DRAW x%,y%-16
+GCOL 0, 0, 128, 0:MOVE x%+width%+16, y%+height%:DRAW x%+width%,y%+height%:DRAW x%+width%,y%+height%+16
+
+:
+SYS "JPEG_PlotTransformed", jpeg%, flags%, transform%, size%
+
+REM Wait for a key press
+G=GET
