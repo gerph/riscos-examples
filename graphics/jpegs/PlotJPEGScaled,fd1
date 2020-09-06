@@ -8,8 +8,6 @@ REM
 
 ON ERROR ERROR EXT ERR, REPORT$ + " at line " + STR$ERL
 :
-MODE 15
-:
 REM File to draw- substitute your own here
 file$="gerph-small/jpg"
 :

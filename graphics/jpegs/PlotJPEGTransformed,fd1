@@ -1,4 +1,4 @@
-REM>PlotJPEG
+REM>PlotJPEGTransformed
 REM Plot a JPEG from memory (ie load it and then plot)
 REM
 REM We try to plot the sprite with the correct size on screen as was intended.
@@ -6,10 +6,8 @@ REM
 
 ON ERROR ERROR EXT ERR, REPORT$ + " at line " + STR$ERL
 :
-MODE 15
-:
 REM File to draw- substitute your own here
-file$="gerph-small-sq/jpg"
+file$="gerph-small/jpg"
 :
 SYS "OS_File", 5, file$ TO ,,,,size%
 DIM jpeg% size%
@@ -43,6 +41,9 @@ PRINT "Image size: ", image_width%, image_height%
 PRINT "Image DPI: ", xdpi%, ydpi%
 IF info_flags% AND %100 THEN
  PRINT "  Image DPI is actually a ratio"
+ENDIF
+IF info_flags% AND %10 THEN
+ PRINT "Renderer cannot arbitrarily transform the image"
 ENDIF
 :
 REM The image size on the screen is used by PlotTransformed is in OS units corrected for the DPI of the
@@ -82,6 +83,12 @@ PRINT "Will scale x: ";xscale
 PRINT "Will scale y: ";yscale
 transform%!0 = xscale * &10000
 transform%!12 = yscale * &10000
+
+REM Try this: See what happens with a transformation that would plot at an angle
+REM Of course, the Classic JPEG plotting functions do not actually support transformed plotting
+REM See bit 1 of the image_flags% for whether this is supported in your version.
+REM transform%!4 = &8000:REM Skew up
+REM transform%!8 = &4000:REM Skew right
 
 REM Apply the offset to the transformation matrix (in Draw coordinates)
 transform%!16 = x% * 256
