@@ -1,0 +1,56 @@
+REM >GetIFAddr
+REM
+REM Read the address of an interface.
+
+REM Get interface address ioctl values (see the TCPIPLibs headers for these details)
+sizeof_ifreq=16+16
+SIOCGIFADDR=FN_IOWR("i",99,sizeof_ifreq)
+:
+REM Address family (IP) and socket type (stream, which is TCP in IP)
+AF_INET = 2
+SOCK_STREAM = 1
+:
+EADDRNOTAVAIL = 49
+ENXIO = 6
+:
+INPUT"Interface (eg 'eh0')";ifname$
+:
+DIM b% 1024
+:
+SYS "Socket_Creat",AF_INET,SOCK_STREAM,0 TO socket
+  :
+  REM Interface address
+  p%=b%
+  sockaddrp%=p%+16
+  $p%=ifname$+CHR$0
+  SYS "XSocket_Ioctl",socket,SIOCGIFADDR,p% TO a% ;flags%
+  IF (flags% AND 1) THEN
+   IF !a% = EADDRNOTAVAIL THEN
+    REM No address
+    ip$="<none>"
+   ELSE
+    IF !a% = ENXIO THEN
+     REM No such interface
+     ip$="<no interface>"
+    ELSE
+     REM Some other error
+     ip$="<error>"
+    ENDIF
+   ENDIF
+  ELSE
+   ip$=STR$(sockaddrp%?4)+"."+STR$(sockaddrp%?5)+"."+STR$(sockaddrp%?6)+"."+STR$(sockaddrp%?7)
+  ENDIF
+  PRINTip$
+  :
+SYS "Socket_Close",socket
+:
+END
+:
+DEFFN_IO(char$,num,size)
+=&20000000+(ASC(char$)<<8)+num
+DEFFN_IOR(char$,num,size)
+=&40000000+(size<<16)+(ASC(char$)<<8)+num
+DEFFN_IOW(char$,num,size)
+=&80000000+(size<<16)+(ASC(char$)<<8)+num
+DEFFN_IOWR(char$,num,size)
+=&C0000000+(size<<16)+(ASC(char$)<<8)+num

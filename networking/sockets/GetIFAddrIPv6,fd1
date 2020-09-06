@@ -1,0 +1,77 @@
+REM >GetIFAddrIPv6
+REM
+REM Read the address of an interface as IPv6.
+
+REM Get interface address ioctl values (see the TCPIPLibs headers for these details)
+sizeof_ifreq=16+16
+SIOCGIFADDR=FN_IOWR("i",99,sizeof_ifreq)
+:
+REM Address family (IPv6) and socket type (stream, which is TCP in IPv6)
+AF_INET6 = 28
+SOCK_STREAM = 1
+:
+REM Some error constants
+EADDRNOTAVAIL = 49
+ENXIO = 6
+:
+INPUT"Interface (eg 'eh0')";ifname$
+:
+DIM b% 1024
+:
+SYS "Socket_Creat",AF_INET6,SOCK_STREAM,0 TO socket
+  :
+  REM Interface address
+  p%=b%
+  sockaddrp%=p%+16
+  $p%=ifname$+CHR$0
+  SYS "XSocket_Ioctl",socket,SIOCGIFADDR,p% TO a% ;flags%
+  IF (flags% AND 1) THEN
+   REM An error was returned - strictly this error number could be either based at 0, or based at the
+   REM internet module's error base.
+   IF !a% = EADDRNOTAVAIL THEN
+    REM No address
+    ip$="<none>"
+   ELSE
+    IF !a% = ENXIO THEN
+     REM No such interface
+     ip$="<no interface>"
+    ELSE
+     REM Some other error
+     ip$="<error>"
+    ENDIF
+   ENDIF
+  ELSE
+   REM A sockaddr_in6 structure looks like this:
+   REM      struct sockaddr_in6 {
+   REM          u_char           sin6_len;      /* length of this structure */
+   REM          u_char           sin6_family;   /* AF_INET6                 */
+   REM          u_int16_t        sin6_port;     /* Transport layer port #   */
+   REM          u_int32_t        sin6_flowinfo; /* IPv6 flow information    */
+   REM          struct in6_addr  sin6_addr;     /* IPv6 address             */
+   REM          uint32_t         sin6_scope_id; /* scope zone index */
+   REM      };
+   REM We're only caring about the IPv6 address, so we'll extract that, in the pairs
+   ip$=""
+   FOR pair = 0 TO 7
+    high%=sockaddrp%?(8 + pair * 2)
+    low%=sockaddrp%?(8 + pair * 2 + 1)
+    halfword% = high% * 256 + low%
+    IF ip$ <> "" THEN ip$+=":"
+    REM For compactness, one run of 0s in the address can be elided in IPv6 addresses. We don't do that here.
+    ip$+=STR$~halfword%
+   NEXT
+  ENDIF
+  PRINTip$
+  :
+SYS "Socket_Close",socket
+:
+END
+:
+DEFFN_IO(char$,num,size)
+=&20000000+(ASC(char$)<<8)+num
+DEFFN_IOR(char$,num,size)
+=&40000000+(size<<16)+(ASC(char$)<<8)+num
+DEFFN_IOW(char$,num,size)
+=&80000000+(size<<16)+(ASC(char$)<<8)+num
+DEFFN_IOWR(char$,num,size)
+=&C0000000+(size<<16)+(ASC(char$)<<8)+num
