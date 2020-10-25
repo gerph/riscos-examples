@@ -1,0 +1,10 @@
+REM >ShowSampleRates
+REM
+REM Show the sample rates available from the sound system.
+
+SYS "Sound_SampleRate",0 TO ,nrates
+PRINT"Sound system has ";nrates;" sample rates available"
+FOR index = 1 TO nrates
+  SYS "Sound_SampleRate",2,index TO ,,rate
+  PRINT"Index ";index;" rate ";rate / 1024;" Hz"
+NEXT
