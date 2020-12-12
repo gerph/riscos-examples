@@ -1,0 +1,18 @@
+REM >FontCaret
+REM
+REM Shows the font caret at a variety of heights, showing how the shape changes.
+
+MODE 27
+
+step = 4
+FOR height = 8 TO 64 STEP step
+ x = 64 + (height/step) * 40
+ y = 64
+ VDU 5:MOVE x - 8, y - 8:PRINT;height:VDU4
+
+ REM The caret's x,y is always the bottom of the shape - the hooks never descend below this position
+ SYS "Font_Caret", 1, height, &10, x, y
+NEXT
+
+G=GET
+
