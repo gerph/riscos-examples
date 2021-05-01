@@ -1,0 +1,106 @@
+REM >ReadPortable
+REM Reads information from the Portable module and shows you it.
+:
+PROCinit
+
+PRINT" Var  Variable name                 Value"
+
+PROCshow_variable(Portable_BMUVariableVersion, "Version", "", 1, 0)
+PROCshow_variable(Portable_BMUVariableNominalCharge, "NominalCharge", "mAh", 1, 0)
+PROCshow_variable(Portable_BMUVariableMeasuredCharge, "MeasuredCharge", "mAh", 1, 0)
+PROCshow_variable(Portable_BMUVariableUsedCharge, "UsedCharge", "mAh", 1, 0)
+PROCshow_variable(Portable_BMUVariableUsableCharge, "UsableCharge", "mAh", 1, 0)
+PROCshow_variable(Portable_BMUVariableChargeEstimate, "ChargeEstimate", "mAh", 1, 0)
+PROCshow_variable(Portable_BMUVariableInstVoltage, "InstVoltage", "mV", 1, 0)
+PROCshow_variable(Portable_BMUVariableInstCurrent, "InstCurrent", "mA", 1, 0)
+PROCshow_variable(Portable_BMUVariableInstTemperature, "InstTemperature", "K", 0.1, 0)
+PROCshow_variable(Portable_BMUVariableFlags, "Flags", "", 1, 0)
+PROCshow_flags
+PROCshow_variable(Portable_BMUVariableChargeRate, "ChargeRate", "", 1, 0)
+PROCshow_variable(Portable_BMUVariableBatteryTimeRemaining, "BatteryTimeRemaining", "s", 1, 0)
+PROCshow_variable(Portable_BMUVariableBatteryTimeMax, "BatteryTimeMax", "s", 1, 0)
+PROCshow_variable(Portable_BMUVariableBatteryPercentage, "BatteryPercentage", "%", 1, 0)
+PROCshow_variable(Portable_BMUVariableBatteryChargeTimeRemaining, "BatteryChargeTimeRemaining", "s", 1, 0)
+PROCshow_variable(Portable_BMUVariableChargeCount, "ChargeCount", "", 1, 0)
+PROCshow_variable(Portable_BMUVariableSmoothedVoltage, "SmoothedVoltage", "mV", 1, 0)
+PROCshow_variable(Portable_BMUVariableSmoothedCurrent, "SmoothedCurrent", "mA", 1, 0)
+PROCshow_variable(Portable_BMUVariableSmoothedNominalCapacity, "SmoothedNominalCapacity", "mAh", 1, 0)
+PROCshow_variable(Portable_BMUVariableSmoothedCompensatedCapacity, "SmoothedCompensatedCapacity", "mAh", 1, 0)
+END
+
+DEF PROCinit
+
+REM Flags
+Portable_BMUBatteryChanged = (1<<0)
+Portable_BMUAtThreshold3 = (1<<0)
+Portable_BMULidOpen = (1<<1)
+Portable_BMUBatteryFlat = (1<<2)
+Portable_BMUAtThreshold2 = (1<<2)
+Portable_BMUBatteryLow = (1<<3)
+Portable_BMUAtThreshold1 = (1<<3)
+Portable_BMUChargingFault = (1<<4)
+Portable_BMUChargeStateKnown = (1<<5)
+Portable_BMUBatteryPresent = (1<<6)
+Portable_BMUChargerConnected = (1<<7)
+Portable_BMUBatteryCharging = (1<<8)
+
+REM BMU Variables
+Portable_BMUVariableVersion = 0
+Portable_BMUVariableNominalCharge = 1
+Portable_BMUVariableMeasuredCharge = 2
+Portable_BMUVariableUsedCharge = 3
+Portable_BMUVariableUsableCharge = 4
+Portable_BMUVariableChargeEstimate = 6
+Portable_BMUVariableInstVoltage = 7
+Portable_BMUVariableInstCurrent = 8
+Portable_BMUVariableInstTemperature = 9
+Portable_BMUVariableFlags = 10
+Portable_BMUVariableChargeRate = 11
+Portable_BMUVariableBatteryTimeRemaining = 21
+Portable_BMUVariableBatteryTimeMax = 22
+Portable_BMUVariableBatteryPercentage = 23
+Portable_BMUVariableBatteryChargeTimeRemaining = 24
+Portable_BMUVariableChargeCount = 25
+Portable_BMUVariableSmoothedVoltage = 26
+Portable_BMUVariableSmoothedCurrent = 27
+Portable_BMUVariableSmoothedNominalCapacity = 28
+Portable_BMUVariableSmoothedCompensatedCapacity = 29
+ENDPROC
+
+DEF PROCshow_variable(var, name$, unit$, multiplier, offset)
+PRINTRIGHT$("    "+STR$var, 4);"  ";name$;SPC(28 - LEN(name$));"  ";
+SYS "XPortable_ReadBMUVariable",var TO r0%,value;flags%
+IF (flags% AND 1) THEN
+    PRINTFNstring0(r0%+4)
+ELSE
+    PRINT;value * multiplier + offset; " ";unit$
+ENDIF
+ENDPROC
+
+DEF PROCshow_flags
+SYS "XPortable_ReadBMUVariable",Portable_BMUVariableFlags TO r0%,value%;flags%
+IF (flags% AND 1) THEN ENDPROC
+
+PROCshow_flag(value%, Portable_BMUAtThreshold3, "AtThreshold3")
+PROCshow_flag(value%, Portable_BMULidOpen, "LidOpen")
+PROCshow_flag(value%, Portable_BMUBatteryFlat, "BatteryFlat")
+PROCshow_flag(value%, Portable_BMUAtThreshold2, "AtThreshold2")
+PROCshow_flag(value%, Portable_BMUBatteryLow, "BatteryLow")
+PROCshow_flag(value%, Portable_BMUAtThreshold1, "AtThreshold1")
+PROCshow_flag(value%, Portable_BMUChargingFault, "ChargingFault")
+PROCshow_flag(value%, Portable_BMUChargeStateKnown, "ChargeStateKnown")
+PROCshow_flag(value%, Portable_BMUBatteryPresent, "BatteryPresent")
+PROCshow_flag(value%, Portable_BMUChargerConnected, "ChargerConnected")
+PROCshow_flag(value%, Portable_BMUBatteryCharging, "BatteryCharging")
+ENDPROC
+
+DEFPROCshow_flag(value%, flag%, name$)
+set$=" "
+IF value% AND flag% THEN set$="+"
+PRINTSPC(36);set$;" ";name$
+ENDPROC
+
+DEFFNstring0(a%)
+LOCAL a$
+SYS "OS_IntOn",a% TO a$
+=a$
