@@ -31,8 +31,7 @@ END
 DEF PROCinit
 
 REM Flags
-Portable_BMUBatteryChanged = (1<<0)
-Portable_BMUAtThreshold3 = (1<<0)
+Portable_BMUBatteryCharged = (1<<0)
 Portable_BMULidOpen = (1<<1)
 Portable_BMUBatteryFlat = (1<<2)
 Portable_BMUBatteryLow = (1<<3)
@@ -41,6 +40,7 @@ Portable_BMUChargeStateKnown = (1<<5)
 Portable_BMUBatteryPresent = (1<<6)
 Portable_BMUChargerConnected = (1<<7)
 Portable_BMUBatteryCharging = (1<<8)
+Portable_BMUBatteryFailing = (1<<9)
 
 REM BMU Variables
 Portable_BMUVariableVersion = 0
@@ -79,7 +79,7 @@ DEF PROCshow_flags
 SYS "XPortable_ReadBMUVariable",Portable_BMUVariableFlags TO r0%,value%;flags%
 IF (flags% AND 1) THEN ENDPROC
 
-PROCshow_flag(value%, Portable_BMUAtThreshold3, "AtThreshold3")
+PROCshow_flag(value%, Portable_BMUBatteryCharged, "BatteryCharged")
 PROCshow_flag(value%, Portable_BMULidOpen, "LidOpen")
 PROCshow_flag(value%, Portable_BMUBatteryFlat, "BatteryFlat")
 PROCshow_flag(value%, Portable_BMUBatteryLow, "BatteryLow")
@@ -88,6 +88,7 @@ PROCshow_flag(value%, Portable_BMUChargeStateKnown, "ChargeStateKnown")
 PROCshow_flag(value%, Portable_BMUBatteryPresent, "BatteryPresent")
 PROCshow_flag(value%, Portable_BMUChargerConnected, "ChargerConnected")
 PROCshow_flag(value%, Portable_BMUBatteryCharging, "BatteryCharging")
+PROCshow_flag(value%, Portable_BMUBatteryFailing, "BatteryFailing")
 ENDPROC
 
 DEFPROCshow_flag(value%, flag%, name$)
