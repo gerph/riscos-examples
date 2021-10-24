@@ -1,0 +1,167 @@
+REM >FontPaint
+REM
+REM Shows examples of different rendering forms used by the FontManager.
+
+:
+ON ERROR ERROR EXT ERR, REPORT$ + " at line " +STR$ERL
+:
+CLS
+:
+REM Fonts we will use for the main font, the secondary font, and symbols.
+f$="Homerton.Medium"
+f2$="Trinity.Bold.Italic"
+fs$="WIMPSymbol"
+REM Base font size
+pt=20
+REM Font aspect ratio, which for simplicity is just 1:1
+ratio=1.0
+REM Where we start rendering; we'll step down the screen
+x%=32:y%=920
+REM Scaling factor from OS coordinates to font units
+REM Could have used Font_ReadScaleFactor instead.
+millipoint% = 400
+:
+REM A coordinate block that we will use for extra parameters
+DIM coords% 32
+coords%!0 = 0:REM space: x spacing
+coords%!4 = 0:REM space: y spacing
+coords%!8 = 0:REM char: x spacing
+coords%!12 = 0:REM char: y spacing
+coords%!16 = 0:REM Rubout: x0
+coords%!20 = 0:REM Rubout: y0
+coords%!24 = 0:REM Rubout: x1
+coords%!28 = 0:REM Rubout: y1
+:
+REM A transformation matrix that we'll use to change its size.
+DIM matrix% 4*6
+:
+REM Some space for the string
+DIM b% 256
+:
+SYS "Font_FindFont",,f$,pt*16,pt*16*ratio,0,0 TO fonth
+SYS "Font_FindFont",,f2$,pt*16,pt*16*ratio,0,0 TO fonth2
+SYS "Font_FindFont",,fs$,pt*16,pt*16*ratio,0,0 TO fonths
+SYS "ColourTrans_SetFontColours",fonth, &00000010, &FFFFFF10, 14
+:
+REM Get line height
+SYS "Font_ReadInfo",fonth TO ,font_xmin, font_ymin, font_xmax, font_ymax
+line_height = (font_ymax - font_ymin) * 1.2
+REM For the purposes of sizing, we'll just scale the base design size
+sizing_box = font_xmax * 10
+:
+REM Plain string (at position in OS units)
+SYS "Font_Paint",fonth, "Plain string", (1<<8)OR(1<<4), x%,y%
+y% -= line_height
+:
+REM Use rubout (as MOVE graphics coords)
+REM (we don't use the bounding box; just a width that is large enough to see that it's filled)
+GCOL 0, 0,0,255:REM Blue
+RECTANGLE x%,y%, sizing_box, font_ymax
+MOVE x%+font_xmin, y%+font_ymin           : REM Rubout bottom left
+MOVE x%+sizing_box, y%+font_ymax          : REM Rubout top right
+SYS "ColourTrans_SetFontColours",fonth, &44444410, &FFFFFF10, 14
+SYS "XFont_Paint",fonth, "Rubout box ["+CHR$&C0+CHR$&B6+"]", (1<<8)OR(1<<4)OR (1<<1), x%,y% TO r0;flags
+IF (flags AND 1) THENPRINT"Rubout box failed: ";FNstring0(r0+4)
+y% -= line_height
+SYS "ColourTrans_SetFontColours",fonth, &00000010, &FFFFFF10, 14
+:
+REM Use coordinates block (spacing of spaces)
+coords%!0 = 32 * millipoint%
+SYS "XFont_Paint",fonth, "Extra word spacing", (1<<8)OR (1<<5), x% * millipoint%,y% * millipoint%,coords% TO r0;flags
+IF (flags AND 1) THENPRINT"Extra word spacing box failed: ";FNstring0(r0+4)
+y% -= line_height
+:
+REM Use coordinates block (spacing of characters)
+coords%!0 = 0 * millipoint%
+coords%!8 = 8 * millipoint%
+SYS "XFont_Paint",fonth, "Extra char spacing", (1<<8)OR (1<<5), x% * millipoint%,y% * millipoint%,coords% TO r0;flags
+IF (flags AND 1) THENPRINT"Extra char spacing box failed: ";FNstring0(r0+4)
+y% -= line_height
+:
+REM Justify (as MOVE graphics coords)
+REM (we don't use the bounding box; just a width that is large enough to see that it's filled)
+GCOL 0, 0,0,255:REM Blue
+RECTANGLE x%,y%, sizing_box, font_ymax
+
+MOVE x%+sizing_box, y%                  : REM Justify right position
+SYS "XFont_Paint",fonth, "Justify text", (1<<8)OR(1<<4)OR (1<<0), x%,y% TO r0;flags
+IF (flags AND 1) THENPRINT"Justify failed: ";FNstring0(r0+4)
+y% -= line_height
+:
+REM Font matrix
+angle=-10:REM Degrees rotation clockwise
+matrix%!0=(1<<16) * COS(RAD(angle))
+matrix%!4=(1<<16) * -SIN(RAD(angle))
+matrix%!8=(1<<16) * SIN(RAD(angle))
+matrix%!12=(1<<16) * COS(RAD(angle))
+matrix%!16=0
+matrix%!20=0
+SYS "XFont_Paint",fonth, "Matrix", (1<<8)OR (1<<6), x%*millipoint%,y%*millipoint%,,matrix% TO r0;flags
+IF (flags AND 1) THENPRINT"Matrix render failed: ";FNstring0(r0+4)
+y% -= line_height
+:
+REM Control characters - set text colour
+SYS "XFont_Paint",fonth, "Controls: "+CHR$19+CHR$0+CHR$0+CHR$0+CHR$255+CHR$64+CHR$64+CHR$14+"Red", (1<<8)OR(1<<4), x%,y% TO r0;flags
+IF (flags AND 1) THENPRINT"Control Set text colour failed: ";FNstring0(r0+4)
+y% -= line_height
+:
+REM Control characters - matrix
+$b%="Controls: "+CHR$27
+n%=(b% + LEN($b%) + 3) AND NOT 3:REM Align
+n%!0=(1<<16):REM xx
+n%!4=0:REM xy
+n%!8=-(1<<16) / 3:REM yx (anti-italic?)
+n%!12=(1<<16):REM yy
+$(n%+16)="Matrix"
+SYS "XFont_Paint",fonth, b%, (1<<8)OR(1<<4), x%,y% TO r0;flags
+IF (flags AND 1) THENPRINT"Control Matrix failed: ";FNstring0(r0+4)
+y% -= line_height
+:
+REM Control characters - set font
+SYS "XFont_Paint",fonth, "Controls: "+CHR$26+CHR$fonth2+"2nd Font", (1<<8)OR(1<<4), x%,y% TO r0;flags
+IF (flags AND 1) THENPRINT"Control Set font failed: ";FNstring0(r0+4)
+y% -= line_height
+:
+REM Control characters - set font (with justify)
+MOVE x%+sizing_box, y%                  : REM Justify right position
+csf12$=CHR$26+CHR$fonth+"^"+CHR$26+CHR$fonths+CHR$&8B+CHR$26+CHR$fonth+"F12"
+SYS "XFont_Paint",fonth, "Controls:"+CHR$&A0+"... "+csf12$, (1<<8)OR(1<<4)OR(1<<0), x%,y% TO r0;flags
+IF (flags AND 1) THENPRINT"Control Set font(2) failed: ";FNstring0(r0+4)
+y% -= line_height
+:
+REM Control characters - move
+dy% = 16 * 400:REM in millipoints
+dx% = 48 * 400:REM in millipoints
+SYS "XFont_Paint",fonth, "Controls: Text "+CHR$11+CHR$(dy%)+CHR$(dy%>>8)+CHR$(dy%>>16)+"Up"+CHR$9+CHR$(dx%)+CHR$(dx%>>8)+CHR$(dx%>>16)+"Right", (1<<8)OR(1<<4), x%,y% TO r0;flags
+IF (flags AND 1) THENPRINT"Control Move failed: ";FNstring0(r0+4)
+y% -= line_height
+:
+REM Control characters - underline
+REM One position is the underline, the second is the strike through.
+upos% = -16:REM in 1/256 of font size
+usize% = 32:REM in 1/256 of font size
+upos2% = 104:REM in 1/256 of font size
+usize2% = 24:REM in 1/256 of font size
+SYS "XFont_Paint",fonth, "Controls: "+CHR$25+CHR$(upos%)+CHR$(usize%)+"Underlined"+CHR$25+CHR$(0)+CHR$(0)+"/"+CHR$25+CHR$(upos2%)+CHR$(usize2%)+"Strike", (1<<8)OR(1<<4), x%,y% TO r0;flags
+IF (flags AND 1) THENPRINT"Control Underline failed: ";FNstring0(r0+4)
+y% -= line_height
+:
+REM Control characters - underline with spacing
+coords%!0 = 0 * millipoint%
+coords%!8 = 8 * millipoint%
+SYS "XFont_Paint",fonth, "Controls: "+CHR$25+CHR$(upos%)+CHR$(usize%)+"Underlined + spacing", (1<<8)OR(1<<5), x% * millipoint%,y% * millipoint%,coords% TO r0;flags
+IF (flags AND 1) THENPRINT"Control Underline failed: ";FNstring0(r0+4)
+y% -= line_height
+
+:
+REM All done
+SYS "Font_LoseFont",fonth
+SYS "Font_LoseFont",fonth2
+SYS "Font_LoseFont",fonths
+:
+G=GET
+END
+
+DEFFNstring0(x%)
+SYS "OS_IntOn",x% TO a$
+=a$
