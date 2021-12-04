@@ -1,0 +1,223 @@
+REM >PlotSprite
+REM Plotting a sprite in many different ways.
+REM
+REM The plots are in different forms and flags.
+REM
+REM Left to right we have:
+REM     Plot at current cursor
+REM     Plot at user coords
+REM     Plot at user coords (scaled+pixtrans'd, default scale)
+REM     Plot at user coords (scaled+pixtrans'd, supplied scale)
+REM     Plot at user coords (transformed+pixtrans'd)
+REM     Plot MASK at current cursor
+REM     Plot MASK at user coords (base version)
+REM     Plot MASK at user coords (scaled, default scale)
+REM     Plot MASK at user coords (transformed, default scale)
+REM
+REM Going up the screen we have:
+REM     No mask, regular plot, plotting with translation table
+REM     With mask, regular plot, plotting with translation table
+REM     No mask, 50% opacity, plotting with translation table
+REM     With mask, 50% opacity, plotting with translation table
+REM     With mask, plotting through the palette (not through the translation)
+REM
+REM Each sprite is plotted with its bottom left and top right corners delimited by
+REM a red square.
+REM Any operation which reports an error will be printed to the screen.
+:
+REM ON ERROR ERROR EXT ERR, REPORT$ + " at line " +STR$ERL
+:
+REM Which mode to use, and the background colour
+MODE28
+GCOL 128, 32,32,32:CLG
+:
+REM Configurable: the sprite file to use, and the sprite number in the file
+file$="cog"
+sprnum% = 1
+:
+REM Configurable: Whether to use the Wimp palette (only for 16 colour sprites)
+use_wimp_palette% = TRUE
+:
+SYS "OS_File",5,file$ TO obj%,,load%,,len%
+IF obj%<>1 THENSYS "OS_File", 19, file$, obj%
+DIM sprarea% len% + 4
+!sprarea% = len% + 4
+sprarea%!8 = 16
+SYS "OS_SpriteOp",&109,sprarea%
+SYS "OS_SpriteOp",&10a,sprarea%,file$
+:
+DIM namebuf% 16
+SYS "OS_SpriteOp", &10d, sprarea%, namebuf%, 16, sprnum% TO ,,name$
+SYS "OS_SpriteOp", &118, sprarea%, name$ TO ,,spr%
+:
+REM Read width, height, mode
+SYS "OS_SpriteOp", &200 + 40, sprarea%, spr% TO ,,,width%, height%, mask%, mode%
+:
+REM Sprite's depth
+SYS "OS_ReadModeVariable",mode%, 9 TO ,,log2bpp%
+SYS "OS_ReadModeVariable",mode%, 4 TO ,,xeig%
+SYS "OS_ReadModeVariable",mode%, 5 TO ,,yeig%
+xlogicalsize% = 1<<xeig%
+ylogicalsize% = 1<<yeig%
+:
+REM Size of this mode's pixels
+SYS "OS_ReadModeVariable",-1, 4 TO ,,xeig%
+SYS "OS_ReadModeVariable",-1, 5 TO ,,yeig%
+xpixelsize% = 1<<xeig%
+ypixelsize% = 1<<yeig%
+
+DIM wimppalette% 16 * 4
+RESTORE +1
+FOR I=0 TO 15
+    READ pal%
+    wimppalette%!(I*4) = pal%
+NEXT
+DATA &FFFFFF00,&DDDDDD00,&BBBBBB00,&99999900
+DATA &77777700,&55555500,&33333300,&00000000
+DATA &99440000,&00EEEE00,&00CC0000,&0000DD00
+DATA &BBEEEE00,&00885500,&00BBFF00,&FFBB0000
+
+REM Generate a pixel translation table for the sprite
+IF use_wimp_palette% AND log2bpp% = 2 THEN
+    SYS "ColourTrans_GenerateTable", 27, wimppalette%, -1, -1,0,%01 TO ,,,,pixtrans_size%
+ELSE
+    SYS "ColourTrans_GenerateTable", 256, spr%, -1, -1,0,%01 TO ,,,,pixtrans_size%
+ENDIF
+PRINT"Pixel translation table size: &";~pixtrans_size%
+DIM pixtrans% pixtrans_size%
+IF use_wimp_palette% AND log2bpp% = 2 THEN
+    SYS "ColourTrans_GenerateTable", 27, wimppalette%, -1, -1,pixtrans%,%01
+ELSE
+    SYS "ColourTrans_GenerateTable", 256, spr%, -1, -1,pixtrans%,%01
+ENDIF
+
+IF FALSE THEN
+    REM Show the pixel translation table (only really useful in 8bpp or lower)
+    FORI=0TO255 STEP 16
+        PRINTI;
+        FOR O=0TO15
+            PRINTRIGHT$("   "+STR$(pixtrans%?(I+O)), 4);
+        NEXT
+        PRINT
+    NEXT
+ENDIF
+
+REM Transformation matrix
+DIM trans% 4*6
+trans%!(4*0)=1<<16:trans%!(4*1)=0
+trans%!(4*2)=0    :trans%!(4*3)=1<<16
+trans%!(4*4)=0    :trans%!(4*5)=0
+
+REM Scale block
+DIM scale% 4*4
+scale%!(0*4) = 1:REM xmult
+scale%!(1*4) = 1:REM ymult
+scale%!(2*4) = 1:REM xdiv
+scale%!(3*4) = 1:REM ydiv
+
+FOR mode = 0 TO 4
+    y%=64 + mode * 128
+    plot_action = 0
+    IF mode = 4 THEN
+        REM Special case plotting through palette
+        use_mask = 1
+        plot_action = (1<<4)
+    ELSE
+        use_mask = mode AND 1
+
+        IF mode AND 2 THEN
+            REM Use 50% transparency
+            plot_action = plot_action OR (128<<8)
+        ENDIF
+    ENDIF
+    plot_action += (8 * use_mask)
+
+    ox% = 0
+
+    REM Plot at current cursor
+    x%=64 + 128 * ox%:ox% += 1
+    GCOL 0, 255, 0, 0:RECTANGLE x%-16,y%-16, 16, 16:REM Bottom left corner
+    GCOL 0, 255, 0, 0:RECTANGLE x%+(width%*xpixelsize%),y%+(height%*ypixelsize%), 16,16:REM Top right corner
+    MOVE x%, y%
+    SYS "XOS_SpriteOp", &200 + 28, sprarea%, spr%,,,plot_action TO ;flags
+    IF flags AND 1 THENPRINT "Plot at cursor failed"
+
+    REM Plot at user coords
+    x%=64 + 128 * ox%:ox% += 1
+    GCOL 0, 255, 0, 0:RECTANGLE x%-16,y%-16, 16, 16:REM Bottom left corner
+    GCOL 0, 255, 0, 0:RECTANGLE x%+(width%*xpixelsize%),y%+(height%*ypixelsize%), 16,16:REM Top right corner
+    MOVE 0, 0
+    SYS "XOS_SpriteOp", &200 + 34, sprarea%, spr%,x%,y%,plot_action TO ;flags
+    IF flags AND 1 THENPRINT "Plot at coords failed"
+
+    REM Plot at user coords (scaled+pixtrans'd, default scale)
+    x%=64 + 128 * ox%:ox% += 1
+    GCOL 0, 255, 0, 0:RECTANGLE x%-16,y%-16, 16, 16:REM Bottom left corner
+    GCOL 0, 255, 0, 0:RECTANGLE x%+(width%*xpixelsize%),y%+(height%*ypixelsize%), 16,16:REM Top right corner
+    MOVE 0, 0
+    SYS "XOS_SpriteOp", &200 + 52, sprarea%, spr%,x%,y%,plot_action,0,pixtrans% TO ;flags
+    IF flags AND 1 THENPRINT "Plot scaled (default) failed"
+
+    REM Plot at user coords (scaled+pixtrans'd, supplied scale)
+    x%=64 + 128 * ox%:ox% += 1
+    GCOL 0, 255, 0, 0:RECTANGLE x%-16,y%-16, 16, 16:REM Bottom left corner
+    GCOL 0, 255, 0, 0:RECTANGLE x%+(width%*xpixelsize%*(scale%!(0*4)/scale%!(2*4))),y%+(height%*ypixelsize%*(scale%!(1*4)/scale%!(3*4))), 16,16:REM Top right corner
+    MOVE 0, 0
+    SYS "XOS_SpriteOp", &200 + 52, sprarea%, spr%,x%,y%,plot_action,scale%,pixtrans% TO r0%;flags
+    IF flags AND 1 THENPRINT "Plot scaled (scale block) failed: ";FNstring0(r0%+4)
+
+    REM Plot at user coords (transformed+pixtrans'd)
+    x%=64 + 128 * ox%:ox% += 1
+    GCOL 0, 255, 0, 0:RECTANGLE x%-16,y%-16, 16, 16:REM Bottom left corner
+    GCOL 0, 255, 0, 0:RECTANGLE x%+(width%*xlogicalsize%),y%+(height%*ylogicalsize%), 16,16:REM Top right corner
+    MOVE 0, 0
+    trans%!(4*4)=x%*256:trans%!(4*5)=y%*256
+    flags% = 0
+    SYS "XOS_SpriteOp", &200 + 56, sprarea%, spr%,flags%,0,plot_action,trans%,pixtrans% TO r0%;flags
+    IF flags AND 1 THENPRINT "Plot transformed failed: ";FNstring0(r0%+4)
+
+    REM Plot MASK at current cursor
+    x%=64 + 128 * ox%:ox% += 1
+    GCOL 0, 255, 0, 0:RECTANGLE x%-16,y%-16, 16, 16:REM Bottom left corner
+    GCOL 0, 255, 0, 0:RECTANGLE x%+(width%*xpixelsize%),y%+(height%*ypixelsize%), 16,16:REM Top right corner
+    MOVE x%, y%
+    GCOL 128, 64, 64, 255
+    SYS "XOS_SpriteOp", &200 + 48, sprarea%, spr% TO ;flags
+    IF flags AND 1 THENPRINT "Plot mask at cursor failed"
+
+    REM Plot MASK at user coords (base version)
+    x%=64 + 128 * ox%:ox% += 1
+    GCOL 0, 255, 0, 0:RECTANGLE x%-16,y%-16, 16, 16:REM Bottom left corner
+    GCOL 0, 255, 0, 0:RECTANGLE x%+(width%*xpixelsize%),y%+(height%*ypixelsize%), 16,16:REM Top right corner
+    MOVE 0, 0
+    GCOL 128, 64, 64, 255
+    SYS "XOS_SpriteOp", &200 + 49, sprarea%, spr%,x%,y%,,0 TO r0%;flags
+    IF flags AND 1 THENPRINT "Plot mask scaled (default) failed: ";FNstring0(r0%+4)
+
+    REM Plot MASK at user coords (scaled, default scale)
+    x%=64 + 128 * ox%:ox% += 1
+    GCOL 0, 255, 0, 0:RECTANGLE x%-16,y%-16, 16, 16:REM Bottom left corner
+    GCOL 0, 255, 0, 0:RECTANGLE x%+(width%*xpixelsize%),y%+(height%*ypixelsize%), 16,16:REM Top right corner
+    MOVE 0, 0
+    GCOL 128, 64, 64, 255
+    SYS "XOS_SpriteOp", &200 + 50, sprarea%, spr%,x%,y%,,0 TO r0%;flags
+    IF flags AND 1 THENPRINT "Plot mask scaled (default) failed: ";FNstring0(r0%+4)
+
+    REM Plot MASK at user coords (transformed, default scale)
+    x%=64 + 128 * ox%:ox% += 1
+    GCOL 0, 255, 0, 0:RECTANGLE x%-16,y%-16, 16, 16:REM Bottom left corner
+    GCOL 0, 255, 0, 0:RECTANGLE x%+(width%*xlogicalsize%),y%+(height%*ylogicalsize%), 16,16:REM Top right corner
+    MOVE 0, 0
+    trans%!(4*4)=x%*256:trans%!(4*5)=y%*256
+    flags% = 0
+    GCOL 128, 64, 64, 255
+    SYS "XOS_SpriteOp", &200 + 55, sprarea%, spr%,flags%,0,0,trans% TO r0%;flags
+    IF flags AND 1 THENPRINT "Plot mask transformed failed: ";FNstring0(r0%+4)
+NEXT
+:
+G=GET
+END
+
+DEFFNstring0(s%):LOCAL a$
+SYS "OS_IntOn",s% TO a$
+=a$
