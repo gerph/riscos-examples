@@ -1,0 +1,176 @@
+REM >iic-ssd1306
+REM
+REM The SSD1306 is an OLED display with an I2C control module.
+REM It has a resolution of 128x96 monochrome pixels.
+REM
+REM https://cdn-shop.adafruit.com/datasheets/SSD1306.pdf
+
+ON ERROR ERROR EXT ERR, REPORT$ + " at line " + STR$ERL
+
+i2c_address%=&3c
+
+DIM b% 64
+
+SSD1306_SETCONTRAST = &81
+SSD1306_DISPLAYALLON_RESUME = &A4
+SSD1306_DISPLAYALLON = &A5
+SSD1306_NORMALDISPLAY = &A6
+SSD1306_INVERTDISPLAY = &A7
+SSD1306_DISPLAYOFF = &AE
+SSD1306_DISPLAYON = &AF
+SSD1306_SETDISPLAYOFFSET = &D3
+SSD1306_SETCOMPINS = &DA
+SSD1306_SETVCOMDETECT = &DB
+SSD1306_SETDISPLAYCLOCKDIV = &D5
+SSD1306_SETPRECHARGE = &D9
+SSD1306_SETMULTIPLEX = &A8
+SSD1306_SETLOWCOLUMN = &00
+SSD1306_SETHIGHCOLUMN = &10
+SSD1306_SETSTARTLINE = &40
+SSD1306_MEMORYMODE = &20
+SSD1306_COLUMNADDR = &21
+SSD1306_PAGEADDR = &22
+SSD1306_COMSCANINC = &C0
+SSD1306_COMSCANDEC = &C8
+SSD1306_SEGREMAP = &A0
+SSD1306_CHARGEPUMP = &8D
+SSD1306_EXTERNALVCC = &1
+SSD1306_SWITCHCAPVCC = &2
+
+width=128
+height=64
+
+PROCbegin
+PROCclear
+PROCimage
+
+END
+:
+DEFPROCbegin
+PROCcommand2(0, SSD1306_DISPLAYOFF)
+PROCcommand2(0, SSD1306_SETDISPLAYCLOCKDIV)
+PROCcommand2(0, 128)
+PROCcommand2(0, SSD1306_SETMULTIPLEX)
+PROCcommand2(0, 63)
+PROCcommand2(0, SSD1306_SETDISPLAYOFFSET)
+PROCcommand2(0, 0)
+PROCcommand2(0, SSD1306_SETSTARTLINE OR 0)
+PROCcommand2(0, SSD1306_CHARGEPUMP)
+PROCcommand2(0, 20)
+PROCcommand2(0, SSD1306_MEMORYMODE)
+PROCcommand2(0, 0)
+PROCcommand2(0, SSD1306_SEGREMAP OR 1)
+PROCcommand2(0, SSD1306_COMSCANDEC)
+PROCcommand2(0, SSD1306_SETCOMPINS)
+PROCcommand2(0, 18)
+PROCcommand2(0, SSD1306_SETCONTRAST)
+PROCcommand2(0, 207)
+PROCcommand2(0, SSD1306_SETPRECHARGE)
+PROCcommand2(0, 241)
+PROCcommand2(0, SSD1306_SETVCOMDETECT)
+PROCcommand2(0, &40)
+PROCcommand2(0, SSD1306_DISPLAYALLON_RESUME)
+PROCcommand2(0, SSD1306_NORMALDISPLAY)
+PROCcommand2(0, SSD1306_DISPLAYON)
+ENDPROC
+:
+DEFPROCclear
+PROCcommand2(0, SSD1306_COLUMNADDR)
+PROCcommand2(0, 0)
+PROCcommand2(0, width-1)
+PROCcommand2(0, SSD1306_PAGEADDR)
+PROCcommand2(0, 0)
+PROCcommand2(0, (height / 8) -1)
+FOR I = 0 TO width*height / 8 / 16
+    PROCcommand17(64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+NEXT
+ENDPROC
+:
+DEFPROCimage
+REM Set up the current address to write into
+PROCcommand2(0, SSD1306_COLUMNADDR)
+PROCcommand2(0, 0)
+PROCcommand2(0, width-1)
+PROCcommand2(0, SSD1306_PAGEADDR)
+PROCcommand2(0, 0)
+PROCcommand2(0, (height / 8) -1)
+REM Write our image
+PROCcommand17(64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+PROCcommand17(64, 0, 0, 0, 0, 220, 171, 1, 43, 209, 2, 87, 0, 143, 40, 19, 108)
+PROCcommand17(64, 48, 232, 192, 96, 192, 192, 128, 192, 128, 0, 0, 0, 0, 0, 0, 0)
+PROCcommand17(64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+PROCcommand17(64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+PROCcommand17(64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+PROCcommand17(64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+PROCcommand17(64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+PROCcommand17(64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+PROCcommand17(64, 0, 0, 0, 0, 42, 84, 171, 0, 76, 51, 0, 77, 18, 64, 12, 193)
+PROCcommand17(64, 0, 176, 5, 87, 172, 27, 110, 147, 44, 223, 33, 222, 54, 222, 54, 222)
+PROCcommand17(64, 52, 236, 92, 180, 108, 216, 56, 248, 208, 48, 240, 32, 112, 96, 192, 192)
+PROCcommand17(64, 128, 128, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+PROCcommand17(64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+PROCcommand17(64, 130, 254, 130, 0, 0, 0, 0, 0, 0, 124, 130, 130, 130, 68, 0, 252)
+PROCcommand17(64, 18, 18, 18, 252, 0, 254, 4, 8, 16, 254, 0, 0, 0, 0, 0, 0)
+PROCcommand17(64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+PROCcommand17(64, 0, 192, 160, 244, 201, 63, 170, 117, 136, 115, 140, 97, 158, 225, 14, 240)
+PROCcommand17(64, 15, 112, 207, 184, 37, 74, 209, 182, 73, 166, 25, 230, 25, 198, 57, 130)
+PROCcommand17(64, 61, 66, 173, 66, 29, 194, 53, 2, 205, 50, 11, 68, 155, 37, 10, 199)
+PROCcommand17(64, 20, 7, 1, 71, 19, 195, 17, 35, 200, 3, 177, 5, 41, 1, 71, 20)
+PROCcommand17(64, 203, 42, 20, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+PROCcommand17(64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 224, 128, 128, 128, 224, 0, 192)
+PROCcommand17(64, 32, 32, 32, 192, 0, 32, 32, 32, 160, 96, 0, 0, 0, 0, 0, 0)
+PROCcommand17(64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 208, 222, 253)
+PROCcommand17(64, 191, 91, 246, 171, 254, 19, 252, 65, 254, 177, 78, 209, 172, 144, 12, 1)
+PROCcommand17(64, 2, 81, 38, 73, 254, 145, 239, 16, 239, 0, 190, 65, 188, 67, 60, 195)
+PROCcommand17(64, 28, 235, 16, 98, 156, 36, 137, 118, 0, 205, 48, 5, 200, 18, 40, 64)
+PROCcommand17(64, 138, 32, 0, 73, 0, 8, 3, 8, 66, 136, 34, 0, 72, 192, 176, 3)
+PROCcommand17(64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+PROCcommand17(64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 15, 0, 0, 0, 15, 0, 15)
+PROCcommand17(64, 1, 1, 1, 15, 0, 12, 10, 9, 8, 8, 0, 0, 0, 0, 0, 0)
+PROCcommand17(64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 20, 254, 223, 247)
+PROCcommand17(64, 188, 239, 187, 86, 253, 171, 86, 221, 178, 77, 251, 142, 115, 222, 247, 175)
+PROCcommand17(64, 253, 55, 220, 231, 190, 109, 243, 175, 218, 119, 158, 117, 190, 77, 235, 138)
+PROCcommand17(64, 193, 176, 198, 8, 128, 16, 200, 9, 176, 3, 36, 201, 2, 16, 197, 40)
+PROCcommand17(64, 2, 208, 4, 113, 132, 208, 8, 112, 74, 212, 48, 237, 223, 48, 239, 0)
+PROCcommand17(64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+PROCcommand17(64, 0, 0, 0, 124, 130, 130, 130, 124, 0, 254, 128, 128, 128, 128, 0, 254)
+PROCcommand17(64, 138, 138, 130, 130, 0, 254, 130, 130, 130, 124, 0, 0, 0, 0, 0, 0)
+PROCcommand17(64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 23, 254, 219)
+PROCcommand17(64, 182, 173, 34, 141, 18, 133, 61, 67, 142, 25, 54, 77, 59, 86, 253, 23)
+PROCcommand17(64, 237, 63, 170, 8, 0, 240, 41, 240, 59, 233, 178, 188, 239, 27, 246, 46)
+PROCcommand17(64, 205, 59, 213, 47, 209, 47, 210, 44, 211, 174, 3, 252, 3, 252, 2, 253)
+PROCcommand17(64, 130, 56, 195, 20, 203, 52, 107, 213, 42, 213, 61, 235, 183, 254, 12, 251)
+PROCcommand17(64, 232, 0, 248, 128, 0, 192, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+PROCcommand17(64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+PROCcommand17(64, 0, 0, 0, 0, 0, 64, 32, 32, 32, 192, 0, 0, 0, 0, 0, 0)
+PROCcommand17(64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1)
+PROCcommand17(64, 7, 62, 252, 194, 61, 200, 50, 200, 34, 148, 40, 193, 26, 224, 0, 92)
+PROCcommand17(64, 24, 112, 98, 72, 160, 64, 245, 34, 5, 3, 156, 3, 140, 19, 172, 9)
+PROCcommand17(64, 74, 21, 66, 159, 4, 43, 196, 27, 130, 44, 83, 36, 75, 212, 139, 50)
+PROCcommand17(64, 222, 33, 222, 33, 212, 41, 86, 233, 87, 249, 47, 210, 47, 208, 39, 220)
+PROCcommand17(64, 43, 247, 76, 187, 234, 22, 233, 20, 232, 16, 224, 0, 0, 0, 0, 0)
+PROCcommand17(64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+PROCcommand17(64, 0, 0, 0, 0, 0, 0, 0, 10, 1, 0, 0, 0, 0, 0, 0, 0)
+PROCcommand17(64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 192)
+PROCcommand17(64, 84, 255, 221, 179, 111, 190, 107, 220, 177, 170, 0, 119, 128, 37, 202, 23)
+PROCcommand17(64, 42, 84, 45, 138, 48, 74, 52, 160, 13, 80, 36, 10, 112, 10, 80, 37)
+PROCcommand17(64, 82, 172, 0, 96, 8, 65, 176, 10, 64, 16, 229, 10, 192, 52, 203, 48)
+PROCcommand17(64, 207, 208, 55, 236, 17, 63, 205, 50, 139, 2, 52, 195, 12, 50, 197, 26)
+PROCcommand17(64, 229, 26, 247, 136, 119, 141, 114, 223, 160, 95, 128, 127, 130, 60, 192, 48)
+PROCcommand17(64, 128, 64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+PROCcommand17(64, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
+ENDPROC
+:
+DEFPROCcommand2(v1%, v2%)
+b%?0=v1%:b%?1=v2%
+SYS "IIC_Control", (i2c_address% << 1), b%, 2
+ENDPROC
+:
+DEFPROCcommand17(v1%, v2%, v3%, v4%, v5%, v6%, v7%, v8%, v9%, v10%, v11%, v12%, v13%, v14%, v15%, v16%, v17%)
+b%?0=v1%:b%?1=v2%:b%?2=v3%:b%?3=v4%
+b%?4=v5%:b%?5=v6%:b%?6=v7%:b%?7=v8%
+b%?8=v9%:b%?9=v10%:b%?10=v11%:b%?11=v12%
+b%?12=v13%:b%?13=v14%:b%?14=v15%:b%?15=v16%
+b%?16=v15%
+SYS "IIC_Control", (i2c_address% << 1), b%, 17
+ENDPROC

@@ -1,0 +1,26 @@
+REM >iic-time
+REM Read the time from the standard PCF 8583 date time/CMOS chip.
+REM
+REM This is the standard real time clock and NVRAM storage on the RiscPC.
+REM
+REM Datasheet:
+REM   https://www.nxp.com/docs/en/data-sheet/PCF8583.pdf
+REM
+
+DIM data% 8
+i2c_address% = &50
+
+REM To read from the device you first have to write a byte to say what address you want to read
+data%?0=1:SYS "IIC_Control", (i2c_address%<<1), data%, 1:REM Set base address
+
+REM Then we can read the data from the clock registers - 6 bytes
+SYS "IIC_Control", (i2c_address%<<1) + 1, data%, 6:REM Read cs,s,m,h,day|year,month
+
+PRINT"Year        : ";~((data%?5) >> 6)
+PRINT"Month       : ";~(data%?5 AND 31)
+PRINT"Day         : ";~(data%?4 AND 63)
+PRINT"Hour        : ";~data%?3
+PRINT"Minute      : ";~data%?2
+PRINT"Second      : ";~data%?1
+PRINT"Centisecond : ";~data%?0
+

@@ -1,0 +1,64 @@
+REM >iic-aht10
+REM AHT10 temperature/humidity sensor
+REM
+REM Datasheet:
+REM   https://server4.eca.ir/eshop/AHT10/Aosong_AHT10_en_draft_0c.pdf
+REM
+:
+ONERROR ERROR EXT ERR, REPORT$+" at line "+STR$ERL
+:
+DIM b% 8
+i2c_address%=&38
+
+REM Commands to set up and read the device
+cmd_initialise%=%11100001
+cmd_measure%=%10101100
+cmd_reset%=%10111010
+REM Responses from the device
+status_busy%=(1<<7)
+status_modemask%=(3<<5)
+status_calibrated%=(1<<2)
+
+REM Reset
+b%?0=cmd_reset%
+SYS "IIC_Control",(i2c_address%<<1),b%,1
+
+REM Initialise
+PRINT "Initialise"
+b%?0=cmd_initialise%
+b%?1=8
+b%?2=0
+SYS "IIC_Control",(i2c_address%<<1),b%,3
+:
+REM Almost certainly an unnecessary wait, but just to be sure.
+PROCget_response
+:
+REM Take a measurement
+PRINT "Measure"
+b%?0=cmd_measure%
+b%?1=&33
+b%?2=0
+SYS "IIC_Control",(i2c_address%<<1),b%,3
+PROCget_response
+FORI=0TO5
+    PRINT"Byte ";I;" &";~b%?I;" = ";b%?I
+NEXT
+temp_value%=(((b%?3) AND 15)<<16) OR ((b%?4)<<8) OR (b%?5)
+PRINT"temp_value = ";~temp_value%
+temp = (temp_value% * 200 / &100000) - 50
+PRINT "Temperature: ";temp
+
+humid_value%=((b%?1)<<12) OR ((b%?2)<<4) OR ((b%?3)>>4)
+humidity = (humid_value% * 100) / &100000
+PRINT "Humidity: ";humidity
+END
+:
+REM Get a response from the chip; it might be busy.
+DEFPROCget_response
+REPEAT
+    SYS "XIIC_Control",(i2c_address%<<1) OR 1,b%,6 TO ;flags%
+    IF (flags% AND 1) THENb%?0=status_busy%
+    REMIF ((b%?0) AND status_busy%) <> 0 THENWAIT
+UNTIL ((b%?0) AND status_busy%) = 0
+PRINT "Status : ";b%?0
+ENDPROC

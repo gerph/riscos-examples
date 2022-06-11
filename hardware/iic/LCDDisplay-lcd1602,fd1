@@ -1,0 +1,107 @@
+REM>LCD
+REM Turn on and show message on the LCD module (LCD1602)
+REM
+REM This is actually two I2C devices on a single module - the LCD display
+REM and the RGB backlight.
+REM
+REM https://thepihut.com/products/rgb-16x2-i2c-lcd-display-3-3v-5v
+REM https://www.waveshare.com/wiki/File:LCD1602_RGB_Module.pdf
+REM
+REM Display control:
+REM     https://support.newhavendisplay.com/hc/en-us/article_attachments/4414498095511/AiP31068.pdf
+REM Backlight control:
+REM     https://www.nxp.com/docs/en/data-sheet/PCA9633.pdf
+REM
+REM Warning: This device will fail if an unexpected read is performed.
+REM          It will hold SDA low, preventing the IIC protocol from
+REM          working.
+
+DIM data% 64
+
+i2c_control% = &7C
+i2c_backlight% = &C0
+
+REM --- Set up the display controller ---
+REM Set number of lines on display and font
+data%?0 = &80:data%?1 = &28:SYS "IIC_Control", i2c_control%, data%, 2
+
+REM Enable the display, turn on cursor, turn off blinking
+data%?0 = &80:data%?1 = &c:SYS "IIC_Control", i2c_control%, data%, 2
+
+REM Clear display
+data%?0 = &80:data%?1 = &1:SYS "IIC_Control", i2c_control%, data%, 2
+
+REM Cursor movement is incrementing, don't shift display
+data%?0 = &80:data%?1 = &6:SYS "IIC_Control", i2c_control%, data%, 2
+
+REM --- Set up the backlight controller ---
+REM Set MODE1 register to normal mode, not auto-incrementing register address
+data%?0 = &0:data%?1 = &0:SYS "IIC_Control", i2c_backlight%, data%, 2
+
+REM Set LED state to allow all LEDs to be driven through PWM and brightness
+data%?0 = &8:data%?1 = &ff:SYS "IIC_Control", i2c_backlight%, data%, 2
+
+REM Set MODE2 register to change colours on STOP command
+data%?0 = &1:data%?1 = &20:SYS "IIC_Control", i2c_backlight%, data%, 2
+
+REM Set the colours of the LEDs
+data%?0 = &4:data%?1 = &ff:SYS "IIC_Control", i2c_backlight%, data%, 2:REM Red
+data%?0 = &3:data%?1 = &40:SYS "IIC_Control", i2c_backlight%, data%, 2:REM Green
+data%?0 = &2:data%?1 = &FF:SYS "IIC_Control", i2c_backlight%, data%, 2:REM Blue
+
+IF FALSE THEN
+    REM Set blinking period
+    REM 192 => 192/256 of the time the light is on (ie 3/4 on)
+    data%?0 = &6:data%?1 = 192:SYS "IIC_Control", i2c_backlight%, data%, 2
+    REM Period of the blinks is in multiples of 0.042second, so 2/0.042 means
+    REM to flash every 2 seconds.
+    data%?0 = &7:data%?1 = 2/0.042:SYS "IIC_Control", i2c_backlight%, data%, 2
+ENDIF
+
+PROCclear
+
+REM Print the time
+last$=""
+REPEAT
+    now$ = TIME$
+    IF now$ <> last$ THEN
+        PROCwritelines(now$)
+        last$=now$
+    ENDIF
+    REM We loop checking keys every 1/10 second so that the clock stays visibly up to date
+    REM (with a 10cs inaccuracy)
+UNTIL INKEY(10)<>-1
+END
+:
+DEFPROCclear
+REM Clear the display with a command
+REM &80 means 'this is a command'
+REM &01 means 'clear the display'
+data%?0 = &80:data%?1 = 1:SYS "IIC_Control", i2c_control%, data%, 2
+ENDPROC
+:
+DEFPROCwritelines(a$)
+REM Move the writing pointer to the top left
+REM &80 means 'this is a command'
+REM &80 + 0 means 'Set DDRAM address to 0' - addresses &0 to &27 are the top line,
+REM                                          addresses &40 to &67 are the bottom line.
+data%?0 = &80:data%?1 = &80 + 0:SYS "IIC_Control", i2c_control%, data%, 2:REM x=0, y=0
+
+REM Write the text itself
+line$ = LEFT$(a$,16)
+REM &40 means the following is data, and then we write the data
+data%?0 = &40:$(data%+1) = line$:SYS "IIC_Control", i2c_control%, data%, 1 + LEN(line$)
+
+REM If there is a second line, print that.
+IF LEN(a$) > 16 THEN
+    REM &80 means 'this is a command'
+    REM &80 + 0 means 'Set DDRAM address to &40' - addresses &0 to &27 are the top line,
+    REM                                            addresses &40 to &67 are the bottom line.
+    data%?0 = &80:data%?1 = &80 + &40:SYS "IIC_Control", i2c_control%, data%, 2:REM x=0, y=1
+
+    REM Write the text itself
+    line$=MID$(a$,17,16)
+    REM &40 means the following is data, and then we write the data
+    data%?0 = &40:$(data%+1) = line$:SYS "IIC_Control", i2c_control%, data%, 1 + LEN(line$)
+ENDIF
+ENDPROC
