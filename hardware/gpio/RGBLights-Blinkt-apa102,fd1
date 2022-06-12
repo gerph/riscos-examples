@@ -1,0 +1,98 @@
+REM >blinkt
+REM Blinkt light, with GPIO 0 wired to DATA, GPIO 1 wired to CLOCK.
+REM
+REM Blinkt contains 8 RGB LED indicators which are controlled over GPIO.
+REM
+REM Product:
+REM     https://shop.pimoroni.com/products/blinkt
+REM
+REM Pin information:
+REM     https://pinout.xyz/pinout/blinkt#
+REM
+REM Each LED is an APA102 LED. Datasheet:
+REM     https://cdn.sparkfun.com/datasheets/Components/LED/APA102C.pdf
+REM
+REM They are driven by clocking in bits to indicate...
+REM     Start of frame  (32 zero bits)
+REM     32bits of data for each LED (repeated) in the form:
+REM         %111<brightness> - to set the brightness of the LED, 0 being off, 31 being full on
+REM         <blue> - to set the blue component, 0 being none, 255 being full on
+REM         <green> - to set the green component, 0 being none, 255 being full on
+REM         <red> - to set the red component, 0 being none, 255 being full on
+REM     End of frame (32 zero bits) [docs say 32 1 bits, but this would force remaining LEDs
+REM         to full brightness white, which surely cannot be right].
+REM
+
+REM Report the board details for GPIO
+SYS "GPIO_GetBoard" TO board%, board_name$
+PRINT "Board type: ";board%
+PRINT "Board name: ";board_name$
+
+REM Note: When used on a RPi these should be 23 and 24.
+pinDAT = 0
+pinCLK = 1
+
+REM Enable pins as outputs (OE stands for 'Output Enable', but it uses 0 to mean output pin,
+REM and 1 to mean input pin).
+SYS "GPIO_WriteOE", pinDAT, 0
+SYS "GPIO_WriteOE", pinCLK, 0
+
+REM How bright the display should be (0 - 1.0, which will be scaled)
+brightness=0.05
+
+REM The value of the RGBs that we'll use (quite dim)
+level = 48
+
+REM Base value for all the RGB values.
+base = 1
+
+PROCstart_of_frame
+FOR I = 0 TO 7
+    PROCwritecolour(base + level * (I AND 1), base + level * (I AND 2)/2, base + level * (I AND 4)/4, brightness)
+NEXT
+PROCend_of_frame
+:
+PRINT "Press a key to clear"
+G=GET
+:
+PROCstart_of_frame
+FOR I = 0 TO 7
+    PROCwritecolour(0, 0, 0, 0)
+NEXT
+PROCend_of_frame
+END
+:
+REM Functions...
+DEFPROCstart_of_frame
+SYS "GPIO_WriteData", pinDAT, 0
+FOR I% = 1 TO 32
+    SYS "GPIO_WriteData", pinCLK, 1
+    SYS "GPIO_WriteData", pinCLK, 0
+NEXT
+ENDPROC
+:
+DEFPROCend_of_frame
+SYS "GPIO_WriteData", pinDAT, 0
+FOR I% = 1 TO 32
+    SYS "GPIO_WriteData", pinCLK, 1
+    SYS "GPIO_WriteData", pinCLK, 0
+NEXT
+ENDPROC
+:
+DEFPROCwritebyte(b%)
+REM Write the pins, clocking the data to the device.
+FOR bit% = 7 TO 0 STEP -1
+    value% = ABS(b% AND (1<<bit%))
+    SYS "GPIO_WriteData", pinDAT, value%
+    SYS "GPIO_WriteData", pinCLK, 1
+    SYS "GPIO_WriteData", pinCLK, 0
+NEXT
+ENDPROC
+:
+DEFPROCwritecolour(r%, g%, b%, brightness)
+brightness = (brightness * 31) AND 31
+PROCwritebyte(%11100000 OR brightness)
+PROCwritebyte(b%)
+PROCwritebyte(g%)
+PROCwritebyte(r%)
+ENDPROC
