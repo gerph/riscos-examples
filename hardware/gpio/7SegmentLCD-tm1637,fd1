@@ -1,0 +1,206 @@
+REM >gpio-TM1637
+REM
+REM The TM1637 is an 7-segment LCD display which is controllable using a serial protocol
+REM similar to the I2C protocol.
+REM
+REM 6 modules from AliExpress:
+REM     https://www.aliexpress.com/item/1005003938180661.html
+REM
+REM Datasheet:
+REM     https://datasheetspdf.com/pdf-file/788613/TitanMicro/TM1637/1
+REM
+REM Example code used as a reference for developing this code:
+REM   https://github.com/WaltonSimons/TM1637
+REM
+REM Warning: Don't plug VCC and GND in the wrong way around.
+REM
+
+ON ERROR ERROR EXT ERR, REPORT$ + " at line " +STR$ERL
+
+REM Pattern of the letters in the LED display:
+REM     a
+REM    ---
+REM  f|   |b
+REM   +---+
+REM  e|^h |c
+REM    --- .dp
+REM     d
+REM
+REM a => bit 0
+REM h => bit 6
+REM dp => bit 7 (if present in the LED display)
+
+DIM number%(16)
+number%(0) = &3f
+number%(1) = &06
+number%(2) = &5b
+number%(3) = &4f
+number%(4) = &66
+number%(5) = &6d
+number%(6) = &7d
+number%(7) = &07
+number%(8) = &7f
+number%(9) = &6f
+number%(10) = &77:REM A
+number%(11) = &7F:REM B
+number%(12) = &39:REM C
+number%(13) = &5e:REM d
+number%(14) = &79:REM E
+number%(15) = &71:REM F
+
+REM Letters:
+DIM letter%(255)
+FOR I=0TO9
+    letter%(ASC(STR$I)) = number%(I)
+NEXT
+letter%(ASC("A")) = &77
+letter%(ASC("B")) = &7f
+letter%(ASC("b")) = &7C
+letter%(ASC("C")) = &39
+letter%(ASC("c")) = &58
+letter%(ASC("D")) = &3f
+letter%(ASC("d")) = &5E
+letter%(ASC("E")) = &79
+letter%(ASC("F")) = &71
+letter%(ASC("G")) = &7d
+letter%(ASC("H")) = &76
+letter%(ASC("h")) = &74
+letter%(ASC("I")) = &06
+letter%(ASC("J")) = &1f
+letter%(ASC("K")) = &76
+letter%(ASC("L")) = &38
+letter%(ASC("l")) = &06
+letter%(ASC("n")) = &54
+letter%(ASC("O")) = &3f
+letter%(ASC("o")) = &5c
+letter%(ASC("P")) = &73
+letter%(ASC("r")) = &50
+letter%(ASC("S")) = &6d
+letter%(ASC("U")) = &3e
+letter%(ASC("V")) = &3e
+letter%(ASC("Y")) = &66
+letter%(ASC("Z")) = &5b
+letter%(ASC(" ")) = &00
+
+REM GPIO pin mapping - this is the mapping on my MCP2221 GPIO device. If you're using this on a
+REM Pi, it would be easiest to use GPIO 2 for CLK and GPIO 3 for DIO.
+pin_clk%=0
+pin_dio%=1
+
+REM Commands
+cmd_data% = (1<<6)
+cmd_ctrl% = (1<<7)
+cmd_addr% = (1<<6) OR (1<<7)
+
+REM The command automatic increment
+cmd_data_inc% = cmd_data% OR %0000
+REM Control commands
+cmd_ctrl_on% = (1<<3)
+cmd_ctrl_off% = (0<<3)
+REM The control command has brightness values 0-7 in bit 0-2.
+
+PROCsetup
+
+PROCbrightness(0)
+
+REM Write some messages and flash them up.
+PROCwrite("HELO")
+
+FORI=0TO4
+    PROCbrightness(I):w=INKEY(3)
+NEXT
+FORI=4TO0 STEP -1
+    PROCbrightness(I):w=INKEY(3)
+NEXT
+
+PROCwrite("Fron"):REM Nobody'll notice the n isn't an m. Honest :-)
+
+FORI=0TO4
+    PROCbrightness(I):w=INKEY(3)
+NEXT
+FORI=6TO0 STEP -1
+    PROCbrightness(I):w=INKEY(3)
+NEXT
+
+PROCwrite("PYro")
+
+FORI=0TO4
+    PROCbrightness(I):w=INKEY(3)
+NEXT
+FORI=4TO0 STEP -1
+    PROCbrightness(I):w=INKEY(3)
+NEXT
+
+w = INKEY(15)
+
+PROCoff
+PROCwrite("    ")
+END
+
+DEFPROCwrite(msg$)
+PROCstart
+PROCsendbyte(cmd_addr% OR 0):REM Start writing data at address 0
+FORI = 1TO LEN(msg$)
+    PROCsendbyte(letter%(ASC(MID$(msg$, I, 1))))
+NEXT
+PROCstop
+ENDPROC
+
+DEFPROCsetup
+REM The system starts with CLK and DIO as output...
+SYS "GPIO_WriteOE",pin_clk%, 0
+SYS "GPIO_WriteOE",pin_dio%, 0
+REM And start them at high.
+SYS "GPIO_WriteData", pin_clk%, 1
+SYS "GPIO_WriteData", pin_dio%, 1
+
+REM Put ourselves into the increment-after-write mode
+PROCstart
+PROCsendbyte(cmd_data_inc%):REM Automatically increment after each write
+PROCstop
+ENDPROC
+
+DEFPROCstart
+REM Start means CLK high and DIO high, then DIO low, then CLK low.
+SYS "GPIO_WriteData", pin_clk%, 1
+SYS "GPIO_WriteData", pin_dio%, 1
+
+REM We signal the start of a command by making DIO low whilst CLK is high
+SYS "GPIO_WriteData", pin_dio%, 0
+SYS "GPIO_WriteData", pin_clk%, 0
+ENDPROC
+
+DEFPROCstop
+REM Stop means CLK low, DIO low, then CLK high then DIO high
+SYS "GPIO_WriteData", pin_clk%, 0
+SYS "GPIO_WriteData", pin_dio%, 0
+SYS "GPIO_WriteData", pin_clk%, 1
+SYS "GPIO_WriteData", pin_dio%, 1
+ENDPROC
+
+DEFPROCsendbyte(x%)
+REM We clock in the bits, Least Significant Bit First
+FORbit%=0TO7
+    IF x% AND (1<<bit%) THENv%=1 ELSE v%=0
+    SYS "GPIO_WriteData", pin_clk%, 0
+    SYS "GPIO_WriteData", pin_dio%, v%
+    SYS "GPIO_WriteData", pin_clk%, 1
+NEXT
+REM Then we have an acknowledgement bit clocked
+SYS "GPIO_WriteData", pin_clk%, 0
+SYS "GPIO_WriteData", pin_dio%, 1
+SYS "GPIO_WriteData", pin_clk%, 1
+SYS "GPIO_WriteData", pin_dio%, 0
+ENDPROC
+:
+DEFPROCbrightness(brightness%)
+PROCstart
+PROCsendbyte(cmd_ctrl% OR cmd_ctrl_on% OR brightness%)
+PROCstop
+ENDPROC
+:
+DEFPROCoff
+PROCstart
+PROCsendbyte(cmd_ctrl% OR cmd_ctrl_off%)
+PROCstop
+ENDPROC
