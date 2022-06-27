@@ -1,0 +1,100 @@
+REM >pca9685-pwm
+REM PCA9685 16-port PWM controller
+REM
+REM Usable as a controller for the FanHat for the Raspberry Pi.
+REM     https://www.waveshare.com/wiki/Fan_HAT
+REM
+REM Datasheet:
+REM     https://www.waveshare.com/w/upload/6/68/PCA96_datasheet.pdf
+REM
+
+DIM b% 256
+
+REM The device can be configured to any hardware selectable device from &40-&7F,
+REM but the default is &40.
+i2c_address% = &40
+
+reg_MODE1       = &00:REM read/write Mode register 1
+reg_MODE2       = &01:REM read/write Mode register 2
+reg_SUBADR1     = &02:REM read/write I2C-bus subaddress 1
+reg_SUBADR2     = &03:REM read/write I2C-bus subaddress 2
+reg_SUBADR3     = &04:REM read/write I2C-bus subaddress 3
+reg_ALLCALLADR  = &05:REM read/write LED All Call I2C-bus address
+reg_PRESCALE    = &FE:REM prescaler for output frequency
+
+REM PWM controls are at &6 - &45 in the order:
+reg_LED_base = &06
+REM LED#_ON_L
+REM LED#_ON_H
+REM LED#_OFF_L
+REM LED#_OFF_H
+
+REM Flags for MODE1
+reg_MODE1_allcalladr_on = (1<<0)
+reg_MODE1_subadr3_on = (1<<1)
+reg_MODE1_subadr2_on = (1<<2)
+reg_MODE1_subadr1_on = (1<<3)
+reg_MODE1_sleep = (1<<4)
+reg_MODE1_autoinc = (1<<5)
+reg_MODE1_extclk = (1<<6)
+reg_MODE1_restart = (1<<7)
+
+PROCpca9685_init
+PROCpca9685_setpwmfreq(50)
+PROCpca9685_setfan(100):REM Full power for a moment to get it running
+i%=INKEY(10)
+PROCpca9685_setfan(10)
+END
+:
+DEFPROCsetfan(percent%)
+DEFPROCpca9685_setfan(percent%)
+PROCpca9685_setpwm(0, 0, 4095*percent%/100)
+ENDPROC
+:
+REM Configure the device by writing to the MODE1 register
+DEFPROCpca9685_init
+REM We want to autoinc
+PROCpca9685_write(reg_MODE1, reg_MODE1_autoinc)
+ENDPROC
+:
+REM Configure the base frequency for PWM
+DEFPROCpca9685_setpwmfreq(frequency)
+base_frequency = INT(0.5 + (25E6 / 4096 / frequency))
+old_mode = FNpca9685_read(reg_MODE1)
+PROCpca9685_write(reg_MODE1, (old_mode AND &7F) OR reg_MODE1_sleep)
+PROCpca9685_write(reg_PRESCALE, base_frequency)
+PROCpca9685_write(reg_MODE1, old_mode)
+PROCpca9685_write(reg_MODE1, old_mode OR reg_MODE1_restart)
+ENDPROC
+:
+DEFPROCpca9685_setpwm(channel, on%, off%)
+PROCpca9685_write4(reg_LED_base + channel * 4, on% AND 255, on%>>8, off% AND 255, off%>>8)
+ENDPROC
+:
+DEFPROCpca9685_write(reg%, value%)
+b%?0=reg%
+b%?1=value%
+SYS "IIC_Control",(i2c_address%<<1),b%, 2
+ENDPROC
+:
+DEFPROCpca9685_write2(reg%, value1%, value2%)
+b%?0=reg%
+b%?1=value1%
+b%?2=value2%
+SYS "IIC_Control",(i2c_address%<<1),b%, 3
+ENDPROC
+:
+DEFPROCpca9685_write4(reg%, value1%, value2%, value3%, value4%)
+b%?0=reg%
+b%?1=value1%
+b%?2=value2%
+b%?3=value3%
+b%?4=value4%
+SYS "IIC_Control",(i2c_address%<<1),b%, 5
+ENDPROC
+
+DEFFNpca9685_read(reg%)
+b%?0=reg%
+SYS "IIC_Control",(i2c_address%<<1),b%, 1
+SYS "IIC_Control",(i2c_address%<<1)+1,b%, 1
+=b%?0
