@@ -1,0 +1,116 @@
+REM >8x8Matrix-max7219
+REM
+REM The MAX7219 is a driver for a multiple 7-segment (+point)  LCD displays. However,
+REM this just means that it has the ability to control 8 different outputs in 8
+REM devices - which can be constructed into an 8x8 matrix of lights.
+REM
+REM Devices:
+REM     https://www.aliexpress.com/item/4000263982956.html
+REM
+REM Datasheet:
+REM     https://datasheets.maximintegrated.com/en/ds/MAX7219-MAX7221.pdf
+REM
+
+ON ERROR ERROR EXT ERR, REPORT$ + " at line " +STR$ERL
+
+REM GPIO pin mapping - this is the mapping on my MCP2221 GPIO device.
+pin_din%=0
+pin_cs%=1
+pin_clk%=2
+
+REM Commands
+cmd_noop% = 0
+cmd_digit0% = 1
+cmd_digit1% = 2
+cmd_digit2% = 3
+cmd_digit3% = 4
+cmd_digit4% = 5
+cmd_digit5% = 6
+cmd_digit6% = 7
+cmd_digit7% = 8
+cmd_decodemode% = 9
+cmd_intensity% = 10
+cmd_scanlimit% = 11
+cmd_shutdown% = 12
+cmd_displaytest% = 15
+
+REM Shutdown format
+cmd_shutdown_shutdown% = 0
+cmd_shutdown_normal% = 1
+REM Decode mode for the commands
+cmd_decodemode_direct% = 0
+cmd_decodemode_bcd% = 1
+REM Intensity format
+cmd_intensity_min% = 0
+cmd_intensity_mid% = 7
+cmd_intensity_max% = 15
+REM Display test format
+cmd_displaytest_normal% = 0
+cmd_displaytest_test% = 1
+
+PROCsetup
+
+REM Turn on a shape
+T=TIME
+PRINT"Show a heart"
+PROCsendcommand(cmd_digit0%, %00100100)
+PROCsendcommand(cmd_digit1%, %01011010)
+PROCsendcommand(cmd_digit2%, %10000001)
+PROCsendcommand(cmd_digit3%, %10000001)
+PROCsendcommand(cmd_digit4%, %10000001)
+PROCsendcommand(cmd_digit5%, %01000010)
+PROCsendcommand(cmd_digit6%, %00100100)
+PROCsendcommand(cmd_digit7%, %00011000)
+PRINT"Done - took "; TIME-T; " cs"
+
+PRINT"Fill it in"
+PROCsendcommand(cmd_digit0%, %00100100)
+PROCsendcommand(cmd_digit1%, %01111110)
+PROCsendcommand(cmd_digit2%, %11111111)
+PROCsendcommand(cmd_digit3%, %11111111)
+PROCsendcommand(cmd_digit4%, %11111111)
+PROCsendcommand(cmd_digit5%, %01111110)
+PROCsendcommand(cmd_digit6%, %00111100)
+PROCsendcommand(cmd_digit7%, %00011000)
+PRINT"Done - took "; TIME-T; " cs"
+END
+
+DEFPROCsetup
+REM The system starts with CLK, CS and DIN as output...
+SYS "GPIO_WriteOE", pin_clk%, 0
+SYS "GPIO_WriteOE", pin_din%, 0
+SYS "GPIO_WriteOE", pin_cs%, 0
+REM And start them in the idle state
+SYS "GPIO_WriteData", pin_clk%, 0
+SYS "GPIO_WriteData", pin_din%, 0
+SYS "GPIO_WriteData", pin_cs%, 1
+
+REM Initialise the device into display mode
+PROCsendcommand(cmd_scanlimit%, 7):REM There are 8 rows (in the matrix that's always true)
+PROCsendcommand(cmd_decodemode%, cmd_decodemode_direct%):REM Direct access to all segments
+PROCsendcommand(cmd_displaytest%, cmd_displaytest_normal%):REM Put us into configured mode
+PROCsendcommand(cmd_shutdown%, cmd_shutdown_normal%):REM Shut down the display
+PROCsendcommand(cmd_intensity%, cmd_intensity_mid%):REM Reduce the brightness to the lowest
+ENDPROC
+
+DEFPROCsendcommand(cmd%, data%)
+REM Commands are 16 bit sequences consisting of a command in the first 8 bits,
+REM followed by data in the subsequent 8 bits.
+REM CS is set low for the duration of the transfer, then set high to complete.
+SYS "GPIO_WriteData", pin_clk%, 0
+SYS "GPIO_WriteData", pin_cs%, 0
+PROCsendbyte(cmd%)
+PROCsendbyte(data%)
+SYS "GPIO_WriteData", pin_cs%, 1
+SYS "GPIO_WriteData", pin_clk%, 0
+ENDPROC
+
+DEFPROCsendbyte(x%)
+REM We clock in the bits, Most Significant Bit First
+FORbit%=7TO0 STEP -1
+    IF x% AND (1<<bit%) THENv%=1 ELSE v%=0
+    SYS "GPIO_WriteData", pin_din%, v%
+    SYS "GPIO_WriteData", pin_clk%, 1
+    SYS "GPIO_WriteData", pin_clk%, 0
+NEXT
+ENDPROC
