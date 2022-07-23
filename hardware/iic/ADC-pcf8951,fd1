@@ -1,0 +1,40 @@
+REM> ADC-PCF8951
+REM The PFC8951 is a 4 ADC, 1 DAC IIC accessible device.
+REM
+REM This example only uses the 4 channel input mode, but other modes can be used
+REM with different differential references.
+REM
+REM My board seems to return biased results on channel 1, with crosstalk to channel 2. It's
+REM not clear whether that's a faulty board or my understanding of how to use it.
+REM
+REM Datasheet:
+REM     https://www.nxp.com/docs/en/data-sheet/PCF8591.pdf
+REM
+
+i2c_address% = &48
+
+DIM b% 16
+
+Control_Channel_Mask% = 3
+Control_AutoInc% = (1<<2)
+Control_InputMode_Mask% = 3<<4
+Control_InputMode_4Channel% = 0<<4
+Control_InputMode_3Channel% = 1<<4:REM Differential to AIN3
+Control_InputMode_Mixed% = 2<<4:REM Ch1, Ch2 are AIN1, AIN2 relative to ground, Ch3 is AIN2 differential to AIN3
+Control_InputMode_2Channel% = 3<<4:REM Ch1 is AIN1 differential to AIN2, Ch2 is AIN3 differential to AIN4
+Control_DACEnable = (1<<6)
+
+REM Want to read from channel 0 stepping through the channels
+REM We must enable the DAC in this mode.
+b%?0=Control_AutoInc% OR Control_InputMode_4Channel% OR Control_DACEnable
+b%?1=0:REM This is the DAC output value.
+SYS "IIC_Control", (i2c_address%<<1), b%, 2
+
+REM Dummy read of the last value, so that the next read is the channel we requested
+SYS "IIC_Control", (i2c_address%<<1) + 1, b%, 1
+:
+REPEAT
+    REM Read all 4 channels
+    SYS "IIC_Control", (i2c_address%<<1) + 1, b%, 4
+    PRINT"Read:",b%?0, b%?1, b%?2, b%?3
+UNTIL INKEY(0)<>-1
