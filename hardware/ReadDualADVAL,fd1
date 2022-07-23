@@ -1,0 +1,73 @@
+REM > ReadDualADVAL
+REM
+REM ADVAL is used to read from the analogue ports.
+REM Analogue ports are provided through the old I/O podule and the ADC module, but
+REM they may be provided by other module implementations as well.
+REM
+REM Usually the ADVAL channels are used to read from the joystick. There are 4
+REM channels which can be enabled, configured by OS_Byte 16.
+REM
+REM This program will read the values of channel 1 and 2 and plot these as coordinates
+REM in a square.
+REM
+REM The values returned by ADVAL are always scaled to 16-bit even if the resolution
+REM of the device is lower.
+REM
+
+ON ERROR ERROREXT ERR, REPORT$+" at line "+STR$ERL
+
+MODE "X800 Y600 C4"
+
+REM Configure 2 ADC channels
+SYS "OS_Byte",16,2
+
+scrwidth% = 1600
+scrheight% = 1200
+chartsize% = 1000
+
+xoffset% = (scrwidth%-chartsize%) / 2
+yoffset% = (scrheight%-chartsize%) / 2
+scale = chartsize% / (1<<16)
+
+centresize% = 64
+positionsize% = 16
+
+GCOL 0, 2:RECTANGLE xoffset%,yoffset%, chartsize%, chartsize%
+
+GCOL 0, 2
+MOVE xoffset% + (chartsize%/2) - centresize%, yoffset% + (chartsize%/2)
+DRAW xoffset% + (chartsize%/2) + centresize%, yoffset% + (chartsize%/2)
+MOVE xoffset% + (chartsize%/2), yoffset% + (chartsize%/2) - centresize%
+DRAW xoffset% + (chartsize%/2), yoffset% + (chartsize%/2) + centresize%
+
+GCOL 3, 3
+xold% = -scrwidth%
+yold% = 0
+
+xinvert% = FALSE
+yinvert% = TRUE
+
+@% = "F5.3"
+
+REPEAT
+    REM ADVAL returns a 16bit value, although the accuracy might be a lot lower.
+    advalx%=ADVAL(1):rawadvalx% = advalx%
+    advaly%=ADVAL(2):rawadvaly% = advaly%
+
+    IF xinvert% THEN advalx% = 65535 - advalx%
+    IF yinvert% THEN advaly% = 65535 - advaly%
+
+    x% = xoffset% + advalx% * scale
+    y% = yoffset% + advaly% * scale
+
+    REM Undraw
+    CIRCLE xold%, yold%, positionsize%
+    CIRCLE x%, y%, positionsize%
+    xold% = x%
+    yold% = y%
+
+    REM Report the %ages to make it easy to check the actual values.
+    VDU30
+    PRINT"X: ";rawadvalx%/65536 * 100;" %"
+    PRINT"Y: ";rawadvaly%/65536 * 100;" %"
+UNTIL INKEY(10) <> -1
