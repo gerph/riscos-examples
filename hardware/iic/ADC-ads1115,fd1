@@ -1,0 +1,152 @@
+REM> ADC-ADS1115
+REM The ADS1115 is a 4 ADC, IIC accessible device.
+REM
+REM This example only uses the 4 channel input mode, but other modes can be used with different
+REM differential references.
+REM
+REM The output is 16bit, but in the single ended differential mode the output will be 15bit.
+REM That means that our read values will be from 0 to 32768, though they may go below 0.
+REM
+REM Datasheet:
+REM     https://www.ti.com/lit/ds/symlink/ads1115.pdf
+REM
+
+ON ERROR ERROR EXT ERR, REPORT$+" at line "+STR$ERL
+
+i2c_address% = &48
+
+DIM b% 256
+
+REM Register address
+ADS1115_Register_Mask        = &03
+ADS1115_Register_Conversion  = &00
+ADS1115_Register_Config      = &01
+ADS1115_Register_ThresholdLo = &02
+ADS1115_Register_ThresholdHi = &03
+
+REM Config Register
+ADS1115_Config_Rate_8       = &0000  :REM 8 samples per second
+ADS1115_Config_Rate_16      = &0020  :REM 16 samples per second
+ADS1115_Config_Rate_32      = &0040  :REM 32 samples per second
+ADS1115_Config_Rate_64      = &0060  :REM 64 samples per second
+ADS1115_Config_Rate_128     = &0080  :REM 128 samples per second
+ADS1115_Config_Rate_250     = &00A0  :REM 250 samples per second (default)
+ADS1115_Config_Rate_475     = &00C0  :REM 475 samples per second
+ADS1115_Config_Rate_860     = &00E0  :REM 860 samples per second
+
+ADS1115_Config_Comparator_Mask      = &0003
+ADS1115_Config_Comparator_Assert1   = &0000  :REM Assert ALERT/RDY after one conversions
+ADS1115_Config_Comparator_Assert2   = &0001  :REM Assert ALERT/RDY after two conversions
+ADS1115_Config_Comparator_Assert3   = &0002  :REM Assert ALERT/RDY after four conversions
+ADS1115_Config_Comparator_Disable   = &0003  :REM Disable the comparator and put ALERT/RDY in high state (default)
+
+ADS1115_Config_ComparatorMode_Mask          = &0010
+ADS1115_Config_ComparatorMode_Traditional   = &0000  :REM Traditional comparator with hysteresis (default)
+ADS1115_Config_ComparatorMode_Window        = &0010  :REM Window comparator
+
+ADS1115_Config_AlertPolarity_Mask       = &0008
+ADS1115_Config_AlertPolarity_ActiveLow  = &0000  :REM ALERT/RDY pin is low when active (default)
+ADS1115_Config_AlertPolarity_ActiveHigh = &0008  :REM ALERT/RDY pin is high when active
+
+ADS1115_Config_AlertLatch_Mask      = &0004  :REM Determines if ALERT/RDY pin latches once asserted
+ADS1115_Config_AlertLatch_NonLatch  = &0000  :REM Non-latching comparator (default)
+ADS1115_Config_AlertLatch_Latch     = &0004  :REM Latching comparator
+
+ADS1115_Config_Conversion_Mask       = &0100
+ADS1115_Config_Conversion_Continous  = &0000  :REM Continuous conversion mode
+ADS1115_Config_Conversion_OneShot    = &0100  :REM Power-down single-shot mode (default)
+
+ADS1115_Config_FSR_MASK     = &0E00
+ADS1115_Config_FSR_6_144V   = &0000  :REM +/-6.144V range
+ADS1115_Config_FSR_4_096V   = &0200  :REM +/-4.096V range
+ADS1115_Config_FSR_2_048V   = &0400  :REM +/-2.048V range (default)
+ADS1115_Config_FSR_1_024V   = &0600  :REM +/-1.024V range
+ADS1115_Config_FSR_0_512V   = &0800  :REM +/-0.512V range
+ADS1115_Config_FSR_0_256V   = &0A00  :REM +/-0.256V range
+
+ADS1115_Config_Measure_Mask     = &7000
+ADS1115_Config_Measure_Differential_0_1 = &0000  :REM Differential P = AIN0, N = AIN1 (default)
+ADS1115_Config_Measure_Differential_0_3 = &1000  :REM Differential P = AIN0, N = AIN3
+ADS1115_Config_Measure_Differential_1_3 = &2000  :REM Differential P = AIN1, N = AIN3
+ADS1115_Config_Measure_Differential_2_3 = &3000  :REM Differential P = AIN2, N = AIN3
+ADS1115_Config_Measure_Single_0 = &4000  :REM Single-ended AIN0
+ADS1115_Config_Measure_Single_1 = &5000  :REM Single-ended AIN1
+ADS1115_Config_Measure_Single_2 = &6000  :REM Single-ended AIN2
+ADS1115_Config_Measure_Single_3 = &7000  :REM Single-ended AIN3
+ADS1115_Config_Measure_Single_Base = &4000
+ADS1115_Config_Measure_Single_Shift = 12
+
+REM Config Register
+ADS1115_Config_State_Mask      = &8000
+ADS1115_Config_State_Convert   = &8000  :REM Write: Set to start a single-conversion
+ADS1115_Config_State_Busy      = &0000  :REM Read: Bit = 0 when conversion is in progress
+ADS1115_Config_State_NotBusy   = &8000  :REM Read: Bit = 1 when device is not performing a conversion
+
+@%="F9.3"
+
+DIM ch%(4)
+REPEAT
+    FOR I=0TO3
+        ch%(I) = FNreadadc(I)
+    NEXT
+    REMPRINT"Read:",ch%(0), ch%(1), ch%(2), ch%(3)
+    PRINT"Read:",ch%(0)/32768*6.144;"V", ch%(1)/32768*6.144;"V", ch%(2)/32768*6.144;"V", ch%(3)/32768*6.144;"V"
+UNTIL INKEY(10) <> -1
+END
+
+DEFFNreadadc(channel%)
+REM First we write the configuration we want to use to the device - we need to say which
+REM channel we want to read (and how to measure it).
+b%?0 = ADS1115_Register_Config
+:
+REM We want the default rate (as we're doing single shot)
+value% = ADS1115_Config_Rate_250
+REM We want to start a conversion
+value% = value% OR ADS1115_Config_State_Convert
+REM And we only want one-shot conversions
+value% = value% OR ADS1115_Config_Conversion_OneShot
+REM We want a single-ended comparison
+value% = value% OR ADS1115_Config_Measure_Single_Base OR (channel% << ADS1115_Config_Measure_Single_Shift)
+REM The full range will be -6.144V - 6.144V. Because we know that the voltage we're running at is 5V so
+REM this full range will cover the maximum then then some. My device wasn't responding to some requests
+REM when driven at 3.3V - probably something about how I'm using it.
+value% = value% OR ADS1115_Config_FSR_6_144V
+REM We don't care about the alert signal so the comparator can be turned off
+value% = value% OR ADS1115_Config_Comparator_Disable
+:
+REM Request that it start the conversion
+b%?1 = (value%>>8) AND 255
+b%?2 = value% AND 255
+REMPRINT "Write: &";~b%?1;", &";~b%?2
+SYS "IIC_Control", (i2c_address%<<1), b%, 3
+:
+REM We should wait until the conversion is complete.
+REM Set this to FALSE to assume that the conversion will have finished.
+IF TRUE THEN
+    REPEAT
+        complete% = FALSE
+        :
+        REM We just read the status back
+        :
+        b%?0 = 0
+        b%?1 = 0
+        SYS "IIC_Control", (i2c_address%<<1) + 1, b%, 2
+        read% = ((b%?0)<<8) OR b%?1
+        complete% = (read% AND ADS1115_Config_State_Mask) = ADS1115_Config_State_NotBusy
+    UNTIL complete%
+    REM Now the conversion is complete, we can read the value.
+ENDIF
+
+REM Switch to read conversion mode
+b%?0 = ADS1115_Register_Conversion
+SYS "IIC_Control", (i2c_address%<<1), b%, 1
+:
+REM And read the converted value
+b%?0 = 0
+b%?1 = 0
+SYS "IIC_Control", (i2c_address%<<1) + 1, b%, 2
+read% = ((b%?0)<<8) OR b%?1
+
+REM This is a signed value, so let's sign extend it.
+read% = (read%<<16)>>16
+=read%
