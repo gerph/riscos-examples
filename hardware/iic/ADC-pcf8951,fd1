@@ -4,8 +4,15 @@ REM
 REM This example only uses the 4 channel input mode, but other modes can be used
 REM with different differential references.
 REM
-REM My board seems to return biased results on channel 1, with crosstalk to channel 2. It's
-REM not clear whether that's a faulty board or my understanding of how to use it.
+REM The board I am using is one of these:
+REM     https://www.aliexpress.com/item/32846817610.html
+REM
+REM This board has 3 jumpers on it, which connect to different devices on the board.
+REM     J4/P4 - connects AIN0 (channel 1) to the light dependant resistor
+REM     J5/P5 - connects AIN1 (channel 2) to the thermistor.
+REM     J6/P6 - connects AIN3 (channel 4) to the potentiometer.
+REM
+REM To use the analogue ports directly, these jumpers must be removed.
 REM
 REM Datasheet:
 REM     https://www.nxp.com/docs/en/data-sheet/PCF8591.pdf
