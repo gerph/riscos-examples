@@ -1,0 +1,119 @@
+REM> PiGlow-sn3218
+REM Control the SN3218 PWM LED controller.
+REM
+REM This PWM LED controller is used in the PiGlow:
+REM     https://shop.pimoroni.com/products/piglow?variant=47170563978
+REM
+REM It is able to independantly control the duty cycle of 18 LEDs, which on the
+REM PiGlow are arranged in a super bright tri-armed spiral.
+REM
+REM Datasheet:
+REM     https://raw.githubusercontent.com/pimoroni/piglow/master/datasheets/sn3218-datasheet.pdf
+REM
+
+DIM b% 256
+
+REM The device has a fixed address.
+i2c_address = &54
+
+REM The layout is something like this:
+REM
+REM   R     g  y  o
+REM    O  b         r
+REM     Y  w W b
+REM      G B  w g
+REM              y
+REM            o
+REM          r
+REM
+
+REM Port mapping to LEDs with the arms they are on:
+REM     0 - A: Red
+REM     1 - A: Orange
+REM     2 - A: Yellow
+REM     3 - A: Green
+REM     4 - B: Blue
+REM     5 - B: Green
+REM     6 - B: Red
+REM     7 - B: Orange
+REM     8 - B: Yellow
+REM     9 - B: White
+REM     10- C: White
+REM     11- C: Blue
+REM     12- A: White
+REM     13- C: Green
+REM     14- A: Blue
+REM     15- C: Yellow
+REM     16- C: Orange
+REM     17- C: Red
+
+REM Mapping from the arms of the spirals to the port numbers
+DIM arm%(2, 5)
+FOR arm = 0 TO 2
+    FOR I = 0 TO 5
+        READ port
+        arm%(arm, I) = port
+    NEXT
+NEXT
+:
+REM Each port listed is one step further inward than the last in each arm.
+REM They are coloured: Red, Orange, Yellow, Green, Blue, White
+DATA 0, 1, 2, 3, 14, 12:REM arm A
+DATA 6, 7, 8, 5, 4, 9:REM arm B
+DATA 17, 16, 15, 13, 11, 10:REM arm C
+
+REM Register definitions
+reg_POWERUP     = 0
+reg_PWMBASE     = 1
+reg_ENABLE1     = &13
+reg_ENABLE2     = &14
+reg_ENABLE3     = &15
+reg_UPDATE      = &16
+reg_RESET       = &17
+
+REM Enable the device
+b%?0=reg_POWERUP
+b%?1=1
+SYS "IIC_Control",(i2c_address<<1),b%,2
+:
+REM We're going to light each arm according to a sine wave so that they fade in and out.
+REM Because the lights get bright really quickly, this will tend towards being brighter
+REM for most of the time. To correct this we could use a gamma table, but that is not
+REM attempted here.
+:
+REM How far through the sequence we are (a measure in radians over a sine wave)
+sequence = 0
+
+REM How many radians to move through the wave each iteration
+glow_step = PI / 32
+
+REM How offset from one another the arms are within the sine wave
+arm_offset = PI * 2 / 3
+
+REM The amplitude of the sine wave
+scale = 6
+WHILE TRUE
+
+    REM We configure all the ports of each ARM to be the same sinusoidal value
+    b%?0=reg_PWMBASE
+    FORarm = 0 TO 2
+        pwm_value = (scale + 1) + scale*SIN(sequence + (arm_offset * arm))
+        FORI = 0 TO 5
+            port = arm%(arm, I)
+            b%?(1 + port) = pwm_value
+        NEXT
+    NEXT
+    REM And we write all the settings in one go.
+    SYS "IIC_Control",(i2c_address<<1),b%,19
+    :
+    REM Enable all the LEDs
+    REM (Strictly we could bundle this into the above operation and just have one write)
+    b%?0=reg_ENABLE1
+    b%?1=63
+    b%?2=63
+    b%?3=63
+    b%?4=255:REM Writing to reg_UPDATE locks in all these values
+    SYS "IIC_Control",(i2c_address<<1),b%,5
+
+    sequence += glow_step
+ENDWHILE
