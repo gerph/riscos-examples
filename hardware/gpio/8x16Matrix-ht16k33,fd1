@@ -1,0 +1,43 @@
+REM >HT16K33
+REM This is a controller for LED displays. It can control up to 16x8
+REM individual LED displays.
+REM
+REM Example device:
+REM     https://www.aliexpress.com/item/1005002583446376.html
+REM
+REM Datasheet:
+REM     https://cdn-shop.adafruit.com/datasheets/ht16K33v110.pdf
+REM
+REM The device I have is wired such that alternate bytes go to
+REM alternate 8x8 displays. This means that constructing a display
+REM will commonly mean interleaving the bit patterns for each row.
+
+ON ERROR ERROR EXT ERR, REPORT$+" at line "+STR$ERL
+
+i2c_address% = &70
+
+DIM b% 16
+
+REM Turn system on
+b%?0=&20 + 1
+SYS "IIC_Control",(i2c_address%<<1),b%,1
+
+
+REM Turn display on
+blink%=1
+b%?0=128 + (blink%<<1) + 1
+SYS "IIC_Control",(i2c_address%<<1),b%,1
+
+REM Fill the array with a sequence to show values
+b%?0=0
+FORI=0TO15
+    b%?(I+1)=I
+NEXT
+SYS "IIC_Control",(i2c_address%<<1),b%,17
+:
+REM Display a chequerboard
+b%?0=0
+FORI=0TO15
+    b%?(I+1)=&55<<((I AND 2)>>1)
+NEXT
+SYS "IIC_Control",(i2c_address%<<1),b%,17
