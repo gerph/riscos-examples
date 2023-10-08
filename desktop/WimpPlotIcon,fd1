@@ -1,0 +1,354 @@
+REM >WimpPlotIcon
+REM Exercise the Wimp_PlotIcon SWI to show off the different icon formats.
+REM
+REM This example shows off how the different icons look on RISC OS.
+REM There are multiple pages showing off the different icon types, and in
+REM most cases they are labelled with the flags and properties that are
+REM set on the icons.
+REM
+REM The labelling uses the following format:
+REM     F - filled
+REM     B - bordered
+REM     T - text
+REM     S - sprite flag set (may not actually have any sprite, though)
+REM     H - horizontal centre
+REM     V - vertical centre
+REM     R - right align
+REM     +s - selected
+REM     +f - faded (shaded, greyed)
+REM     +R# - uses a border specification
+REM
+REM On running the example, multiple pages will be shown of the icons.
+REM Press space to step to the next page.
+REM
+REM Page 1 - text alignment, colours and borders.
+REM
+REM * The bottom left square of 4x4 icons shows the different alignments,
+REM   the left 8 showing just text flags, and the right 8 showing text
+REM   and sprite flags set.
+REM * The 8 icons above use the bordered R1-R6, and their selected forms
+REM * The 3 icons above that show off the C validation specification, and
+REM   the selection and fading.
+REM   The rightmost of the 4 is the final R7 border.
+REM * The right column shows unfilled icon styles, for regular and selected
+REM   text icons, and then the 2 variants that have the sprite flag set,
+REM   showing the filling only covers the text.
+REM * Above those final icons are some regular coloured icons, in unselected
+REM   and faded styles.
+REM
+REM Page 2 - sprites alignment
+REM
+REM * The bottom left rectangle of 8 icons shows the alignment effects when
+REM   a sprite is used.
+REM * The two sprites above show the selected and faded forms.
+REM
+REM Page 3 - text+sprite alignment
+REM
+REM * Again, the bottom left rectangle of 8 icons shows the alignment
+REM   effects, this time for text and sprites.
+REM * Above this in the first column, there is the half size sprite flag
+REM * And the pair above those show the selected, filled text and sprite,
+REM   and above that the selected, unfilled text and sprite.
+REM * On the right there are 4 example of the sprite pairs, which show
+REM   the effect of their selection, with and without the filled flag.
+REM
+REM Page 4 - multi-line alignment
+REM
+REM * The examples on this page show the effect of the 'L' long text
+REM   validation.
+REM * The bottom 8 icons demonstrate the different alignment flags.
+REM * The top 4 icons demonstrate the use of long text with sprites.
+REM * The screenshots alongside this page has two variants - one for
+REM   RISC OS Classic, which only ever centres the long text, and
+REM   RISC OS Pyromaniac which honours the alignment flags.
+REM
+REM Page 5 - multi-line unfilled
+REM
+REM * These examples show the effect of the unfilled multiline text.
+REM * Again the screenshots are different for RISC OS Classic and
+REM   RISC OS Pyromaniac, as Classic does not follow the same pattern
+REM   as the regular text.
+REM
+
+REM Select a mode that has 256 colours so that we have colours to match
+MODE 28
+REMMODE "X1600 Y1200 C256 EX0 EY0"
+
+ON ERROR ERROR EXT ERR, LEFT$(REPORT$, 240)+" at line "+STR$ERL
+
+REM Uncomment the font if you want to see how the icons look in system font.
+*|Set Wimp$Font None
+
+REM We want to use the standard fonts (which should already be iconsprite'd,
+REM but just to be sure)
+*IconSprites Resources:$.Resources.Wimp.Sprites
+
+REM Force graphics characters to 16x32
+VDU23,17,7,6, 8,0, 16,0, 0,0
+
+REM Background white, foreground black
+SYS "Wimp_TextColour", (1<<7) OR (0)
+SYS "Wimp_TextColour", (0<<7) OR (7)
+CLS
+
+DIM b% 256
+DIM it% 256
+DIM iv% 256
+
+Wimp_IconText = (1<<0)
+Wimp_IconSprite = (1<<1)
+Wimp_IconBorder = (1<<2)
+Wimp_IconHCentred = (1<<3)
+Wimp_IconVCentred = (1<<4)
+Wimp_IconFilled = (1<<5)
+Wimp_IconAntiAliased = (1<<6)
+Wimp_IconNeedsHelp = (1<<7)
+Wimp_IconIndirected = (1<<8)
+Wimp_IconRJustified = (1<<9)
+Wimp_IconAllowAdjust = (1<<10)
+Wimp_IconHalfSize = (1<<11)
+Wimp_IconButtonTypeShift = 12
+Wimp_IconButtonType = (15<<12)
+Wimp_IconESG = (31<<16)
+Wimp_IconSelected = (1<<21)
+Wimp_IconShaded = (1<<22)
+Wimp_IconDeleted = (1<<23)
+Wimp_IconFGColourShift = 24
+Wimp_IconBGColourShift = 28
+Wimp_IconFGColour = 15<<24
+Wimp_IconBGColour = 15<<28
+
+reset_x%=16:reset_y%=64
+
+x%=reset_x%:y%=reset_y%
+w%=224:h%=80
+
+extra_h% = 32
+extra_w% = 32
+
+REPEAT
+    READ text$, valid$, or_flags%, bic_flags%
+    IF text$ <> "END" AND text$<> "COLUMN" AND text$<>"PAGE" THEN
+        REM Bounding box
+        b%!0 = x%
+        b%!4 = y%
+        b%!8 = x% + w%
+        b%!12 = y% + h%
+
+        IF LEFT$(valid$, 1) = "L" THEN
+            REM Make the long text icon bigger.
+            b%!12 = b%!12 + h% * 2
+            y% += h% * 2
+        ENDIF
+
+        REM Black on light grey
+        flags% = (7<<Wimp_IconFGColourShift) OR (1<<Wimp_IconBGColourShift)
+        flags% = flags% OR Wimp_IconText OR Wimp_IconIndirected
+        flags% = flags% OR Wimp_IconBorder
+        flags% = flags% OR Wimp_IconFilled
+
+        flags% = flags% AND NOT bic_flags%
+        flags% = flags% OR or_flags%
+
+        REM PRINT "Flags: &";~flags%;"  OR: &";~or_flags%;"  Text: ";text$
+
+        b%!16 = flags%
+
+        REM Icon data
+        REMtext$ += "+ REALLY LONG!"
+        b%!20 = it%
+        $it% = text$
+        IF (flags% AND (Wimp_IconText OR Wimp_IconSprite OR Wimp_IconIndirected)) = (Wimp_IconSprite OR Wimp_IconIndirected) THEN
+            b%!24 = 1
+            b%!28 = LEN(text$)
+        ELSE
+            IF valid$ <> "" THEN
+                $iv% = valid$
+                b%!24 = iv%
+            ELSE
+                b%!24 = -1
+            ENDIF
+            b%!28 = LEN(text$)
+        ENDIF
+
+        REM Regular PlotIcon
+        SYS "Wimp_PlotIcon",,b%
+        REM Declare the background colour to fade to:
+        REMSYS "Wimp_PlotIcon",,b%,&5441534B, %01, 0,0, &81397900
+
+        VDU4:REM RISC OS Classic leaves you in VDU 5 mode, and resets the text cursor to top left.
+
+        y% += h% + extra_h%
+    ENDIF
+    IF text$ = "COLUMN" THEN
+        x% += w% + extra_w%
+        y% = reset_y%
+    ENDIF
+    IF text$ = "PAGE" THEN
+        G=GET
+        CLS
+        x% = reset_x%
+        y% = reset_y%
+    ENDIF
+UNTIL text$ = "END"
+
+G=GET
+
+REM All of the examples here are driven by this data table.
+REM Each icon is described in terms of 4 parameters:
+REM   Text to use (or special word)
+REM   Validation to use (or special word)
+REM   Additional flags to set on the basic icon
+REM   Flags to clear on the basic icon
+REM
+REM Each icon goes up the screen one step.
+REM When the special words are encountered, things happen differently:
+REM   COLUMN - moves to the bottom of a new column
+REM   PAGE - waits for a key and then clears to start a new page
+REM   END - exits
+REM
+REM Any validation starting with 'L' has a much larger basic icon size.
+REM
+
+REM Text
+DATA "FB T", "", 0, 0
+DATA "FB TV", "", Wimp_IconVCentred, 0
+DATA "FB TH", "", Wimp_IconHCentred, 0
+DATA "FB THV", "", (Wimp_IconHCentred + Wimp_IconVCentred), 0
+DATA "FB THV+R1", "R1", (Wimp_IconHCentred + Wimp_IconVCentred), 0
+DATA "FB THV+R2", "R2", (Wimp_IconHCentred + Wimp_IconVCentred), 0
+
+DATA "Y-on-P", "C3Fc6b9/813979", 0, 0
+
+DATA "COLUMN", "", 0, 0
+
+DATA "FB TR", "", Wimp_IconRJustified, 0
+DATA "FB TVR", "", Wimp_IconVCentred + Wimp_IconRJustified, 0
+DATA "FB THR", "", Wimp_IconHCentred + Wimp_IconRJustified, 0
+DATA "FB THVR", "", (Wimp_IconHCentred + Wimp_IconVCentred + Wimp_IconRJustified), 0
+
+DATA "FB THV+R3", "R3", (Wimp_IconHCentred + Wimp_IconVCentred), 0
+DATA "FB THV+R4", "R4", (Wimp_IconHCentred + Wimp_IconVCentred), 0
+
+DATA "Y-on-P +s", "C3Fc6b9/813979", Wimp_IconSelected, 0
+
+DATA "COLUMN", "", 0, 0
+
+REM Text+Sprite (but no sprite)
+DATA "FB ST", "", Wimp_IconSprite + 0, 0
+DATA "FB STV", "", Wimp_IconSprite + Wimp_IconVCentred, 0
+DATA "FB STH", "", Wimp_IconSprite + Wimp_IconHCentred, 0
+DATA "FB STHV", "", (Wimp_IconSprite + Wimp_IconHCentred + Wimp_IconVCentred), 0
+
+DATA "FB THV+R5", "R5", (Wimp_IconHCentred + Wimp_IconVCentred), 0
+DATA "FB THV+R6", "R6", (Wimp_IconHCentred + Wimp_IconVCentred), 0
+
+DATA "FB T +f", "", Wimp_IconShaded, 0
+
+DATA "COLUMN", "", 0, 0
+
+DATA "FB STR", "", Wimp_IconSprite + Wimp_IconRJustified, 0
+DATA "FB STVR", "", Wimp_IconSprite + Wimp_IconVCentred + Wimp_IconRJustified, 0
+DATA "FB STHR", "", Wimp_IconSprite + Wimp_IconHCentred + Wimp_IconRJustified, 0
+DATA "FB STHVR", "", (Wimp_IconSprite + Wimp_IconHCentred + Wimp_IconVCentred + Wimp_IconRJustified), 0
+
+DATA "FB THV+R5 +s", "R5", (Wimp_IconSelected + Wimp_IconHCentred + Wimp_IconVCentred), 0
+DATA "FB THV+R6 +s", "R6", (Wimp_IconSelected + Wimp_IconHCentred + Wimp_IconVCentred), 0
+
+DATA "FB THV+R7", "R7", (Wimp_IconHCentred + Wimp_IconVCentred), (15<<Wimp_IconBGColourShift)
+
+DATA "COLUMN", "", 0, 0
+
+REM Unfilled text
+DATA "B THV", "", (Wimp_IconHCentred + Wimp_IconVCentred), Wimp_IconFilled
+DATA "B THV +s", "", (Wimp_IconSelected + Wimp_IconHCentred + Wimp_IconVCentred), Wimp_IconFilled
+DATA "B STHV", "", (Wimp_IconSprite + Wimp_IconHCentred + Wimp_IconVCentred), Wimp_IconFilled
+DATA "B STHV +s", "", (Wimp_IconSprite + Wimp_IconSelected + Wimp_IconHCentred + Wimp_IconVCentred), Wimp_IconFilled
+
+REM Colouring with shading
+DATA "Red-on-Cream", "", (12<<Wimp_IconBGColourShift) + (11<<Wimp_IconFGColourShift), (15<<Wimp_IconBGColourShift) + (15<<Wimp_IconFGColourShift)
+DATA "Red-on-Cream +f", "", Wimp_IconShaded + (12<<Wimp_IconBGColourShift) + (11<<Wimp_IconFGColourShift), (15<<Wimp_IconBGColourShift) + (15<<Wimp_IconFGColourShift)
+
+DATA "PAGE", "", 0, 0
+
+REM Sprite
+DATA "grightc", "", Wimp_IconSprite + 0, Wimp_IconText
+DATA "grightc", "", Wimp_IconSprite + Wimp_IconVCentred, Wimp_IconText
+DATA "grightc", "", Wimp_IconSprite + Wimp_IconHCentred, Wimp_IconText
+DATA "grightc", "", (Wimp_IconSprite + Wimp_IconHCentred + Wimp_IconVCentred), Wimp_IconText
+
+DATA "grightc", "", Wimp_IconSprite + Wimp_IconSelected, Wimp_IconText
+
+DATA "COLUMN", "", 0, 0
+
+DATA "grightc", "", Wimp_IconSprite + Wimp_IconRJustified, Wimp_IconText
+DATA "grightc", "", Wimp_IconSprite + Wimp_IconVCentred + Wimp_IconRJustified, Wimp_IconText
+DATA "grightc", "", Wimp_IconSprite + Wimp_IconHCentred + Wimp_IconRJustified, Wimp_IconText
+DATA "grightc", "", (Wimp_IconSprite + Wimp_IconHCentred + Wimp_IconVCentred + Wimp_IconRJustified), Wimp_IconText
+
+DATA "grightc", "", Wimp_IconSprite + Wimp_IconShaded, Wimp_IconText
+
+DATA "PAGE", "", 0, 0
+
+REM Text+Sprite (with sprite)
+DATA "FB ST", "Sgrightc", Wimp_IconSprite + 0, 0
+DATA "FB STV", "Sgrightc", Wimp_IconSprite + Wimp_IconVCentred, 0
+DATA "FB STH", "Sgrightc", Wimp_IconSprite + Wimp_IconHCentred, 0
+DATA "FB STHV", "Sgrightc", (Wimp_IconSprite + Wimp_IconHCentred + Wimp_IconVCentred), 0
+DATA "FB ST+h", "Sgrightc", Wimp_IconSprite + Wimp_IconHalfSize, 0
+DATA "FB STV+s", "Sgrightc", Wimp_IconSprite + Wimp_IconVCentred + Wimp_IconSelected, 0
+DATA "B STV+s", "Sgrightc", Wimp_IconSprite + Wimp_IconVCentred + Wimp_IconSelected, Wimp_IconFilled
+
+DATA "COLUMN", "", 0, 0
+
+DATA "FB STR", "Sgrightc", Wimp_IconSprite + Wimp_IconRJustified, 0
+DATA "FB STVR", "Sgrightc", Wimp_IconSprite + Wimp_IconVCentred + Wimp_IconRJustified, 0
+DATA "FB STHR", "Sgrightc", Wimp_IconSprite + Wimp_IconHCentred + Wimp_IconRJustified, 0
+DATA "FB STVHR", "Sgrightc", (Wimp_IconSprite + Wimp_IconHCentred + Wimp_IconVCentred + Wimp_IconRJustified), 0
+
+DATA "COLUMN", "", 0, 0
+
+DATA "FB STV 0/1", "Soptoff,opton", Wimp_IconSprite + Wimp_IconVCentred, 0
+DATA "FB STV 0/1+s", "Soptoff,opton", Wimp_IconSprite + Wimp_IconVCentred + Wimp_IconSelected, 0
+
+DATA "B STV 0/1", "Soptoff,opton", Wimp_IconSprite + Wimp_IconVCentred, Wimp_IconFilled
+DATA "B STV 0/1+s", "Soptoff,opton", Wimp_IconSprite + Wimp_IconVCentred + Wimp_IconSelected, Wimp_IconFilled
+
+REM Long text
+
+DATA "PAGE", "", 0, 0
+
+DATA "Long T message goes here", "L", 0, 0
+DATA "Long TV message goes here", "L", Wimp_IconVCentred, 0
+DATA "Long ST message goes here", "L;Sgrightc", Wimp_IconSprite, 0
+
+DATA "COLUMN", "", 0, 0
+
+DATA "Long TH message goes here", "L", Wimp_IconHCentred, 0
+DATA "Long THV message goes here", "L", (Wimp_IconHCentred + Wimp_IconVCentred), 0
+DATA "Long STH message goes here", "L;Sgrightc", (Wimp_IconSprite + Wimp_IconHCentred), 0
+
+DATA "COLUMN", "", 0, 0
+
+DATA "Long TR message goes here", "L", Wimp_IconRJustified, 0
+DATA "Long TVR message goes here", "L", Wimp_IconVCentred + Wimp_IconRJustified, 0
+DATA "Long STVR message goes here", "L", Wimp_IconSprite + Wimp_IconVCentred + Wimp_IconRJustified, 0
+
+DATA "COLUMN", "", 0, 0
+
+DATA "Long THR message goes here", "L", Wimp_IconHCentred + Wimp_IconRJustified, 0
+DATA "Long THVR message goes here", "L", (Wimp_IconHCentred + Wimp_IconVCentred + Wimp_IconRJustified), 0
+DATA "Long STHVR message goes here", "L;Sgrightc", (Wimp_IconSprite + Wimp_IconHCentred + Wimp_IconVCentred + Wimp_IconRJustified), 0
+
+DATA "PAGE", "", 0, 0
+
+DATA "Long T unfilled message goes here", "L", 0, Wimp_IconFilled
+DATA "Long ST unfilled message goes here", "L", Wimp_IconSprite, Wimp_IconFilled
+
+
+DATA "COLUMN", "", 0, 0
+
+DATA "Long THV unfilled message goes here", "L", Wimp_IconHCentred + Wimp_IconVCentred, Wimp_IconFilled
+DATA "Long STHV unfilled message goes here", "L", Wimp_IconSprite + Wimp_IconHCentred + Wimp_IconVCentred, Wimp_IconFilled
+
+DATA "END", "", 0, 0
